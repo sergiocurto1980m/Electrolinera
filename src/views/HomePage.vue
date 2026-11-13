@@ -97,6 +97,34 @@
           </div>
         </section>
 
+        <section v-if="isAuthenticated && miEstacion" class="active-session">
+          <span class="active-session__icon" aria-hidden="true">
+            <ion-icon :icon="flashOutline" />
+          </span>
+
+          <div class="active-session__copy">
+            <p class="active-session__eyebrow">Tu puesto</p>
+            <h2>
+              {{ miEstacion.tipo_estacion }} · Poste
+              {{ miEstacion.tipo_poste }} · Toma {{ miEstacion.tipo_toma }}
+            </h2>
+            <p>
+              Mientras estés enganchado solo puedes desengancharte de este
+              puesto.
+            </p>
+          </div>
+
+          <button
+            class="active-session__action"
+            type="button"
+            :disabled="accionando"
+            @click="onDesengancharse(miEstacion)"
+          >
+            <unplug-icon />
+            <span>{{ accionando ? 'Desenganchando…' : 'Desengancharse' }}</span>
+          </button>
+        </section>
+
         <section
           v-if="loading"
           class="type-summary-grid"
@@ -116,7 +144,7 @@
         >
           <type-summary-card
             v-for="grupo in grupos"
-            :key="grupo.tipo"
+            :key="grupo.tipoId"
             :grupo="grupo"
             :show-status="isAuthenticated"
           />
@@ -159,9 +187,16 @@
           <div v-else class="group-list">
             <station-group
               v-for="grupo in grupos"
-              :key="grupo.tipo"
+              :key="grupo.tipoId"
               :grupo="grupo"
               :show-status="isAuthenticated"
+              :mi-estacion-id="miEstacion?.id ?? null"
+              :usuario-en-cola="usuarioEnCola"
+              :accionando="accionando"
+              @engancharse="onEngancharse"
+              @desengancharse="onDesengancharse"
+              @entrar-en-cola="onEntrarEnCola"
+              @salir-de-cola="onSalirDeCola"
             />
           </div>
         </section>
@@ -187,12 +222,22 @@
         color="success"
         @did-dismiss="dismissToast"
       />
+
+      <ion-toast
+        :key="actionToast?.id ?? 0"
+        :is-open="actionToast !== null"
+        :message="actionToast?.message ?? ''"
+        :duration="4200"
+        position="bottom"
+        :color="actionToast?.color ?? 'success'"
+        @did-dismiss="actionToast = null"
+      />
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import {
   IonButtons,
   IonContent,
@@ -217,8 +262,15 @@ import ConnectionBadge from '@/components/ConnectionBadge.vue'
 import HeaderUser from '@/components/HeaderUser.vue'
 import StationGroup from '@/components/StationGroup.vue'
 import TypeSummaryCard from '@/components/TypeSummaryCard.vue'
+import UnplugIcon from '@/components/icons/UnplugIcon.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useHomeLive } from '@/composables/useHomeLive'
+import {
+  desengancharse,
+  engancharse,
+  entrarEnCola,
+  salirDeCola,
+} from '@/services/estacion.service'
 import { formatHora } from '@/utils/format'
 import type {
   HomeEstacion,
@@ -242,6 +294,96 @@ const {
 
 const { isAuthenticated } = useAuth()
 
+const accionando = ref(false)
+const actionToast = ref<{
+  id: number
+  message: string
+  color: 'success' | 'danger'
+} | null>(null)
+
+const miEstacion = computed(
+  () => estaciones.value.find((estacion) => estacion.es_mio) ?? null,
+)
+
+function getActionError(cause: unknown): string {
+  if (cause instanceof Error) {
+    return cause.message
+  }
+
+  if (typeof cause === 'object' && cause !== null && 'message' in cause) {
+    const message = (cause as { message?: unknown }).message
+    if (typeof message === 'string' && message.length > 0) {
+      return message
+    }
+  }
+
+  return 'No se pudo completar la acción.'
+}
+
+async function runAction(
+  accion: () => Promise<unknown>,
+  successMessage: string,
+): Promise<void> {
+  if (accionando.value) return
+
+  if (isPreview) {
+    actionToast.value = {
+      id: Date.now(),
+      message: 'Vista previa local: las acciones no se guardan.',
+      color: 'success',
+    }
+    return
+  }
+
+  accionando.value = true
+
+  try {
+    await accion()
+    actionToast.value = {
+      id: Date.now(),
+      message: successMessage,
+      color: 'success',
+    }
+    await refresh()
+  } catch (cause) {
+    actionToast.value = {
+      id: Date.now(),
+      message: getActionError(cause),
+      color: 'danger',
+    }
+  } finally {
+    accionando.value = false
+  }
+}
+
+function onEngancharse(estacion: HomeEstacion): void {
+  void runAction(
+    () => engancharse(estacion.id),
+    `Te has enganchado al Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma}.`,
+  )
+}
+
+function onDesengancharse(estacion: HomeEstacion): void {
+  void runAction(
+    () => desengancharse(estacion.id),
+    'Te has desenganchado. El puesto queda libre.',
+  )
+}
+
+function onEntrarEnCola(grupo: HomeGrupoEstacion): void {
+  void runAction(
+    () => entrarEnCola(grupo.tipoId),
+    `Estás en la cola de ${grupo.tipo}.`,
+  )
+}
+
+function onSalirDeCola(grupo: HomeGrupoEstacion): void {
+  void runAction(
+    () => salirDeCola(grupo.tipoId),
+    `Has salido de la cola de ${grupo.tipo}.`,
+  )
+}
+
 const subtitle = computed(() => {
   if (isPreview) {
     return isAuthenticated.value
@@ -263,23 +405,29 @@ const connectionStatus = computed<LiveStatus>(() =>
 )
 
 const grupos = computed<HomeGrupoEstacion[]>(() => {
-  const mapa = new Map<string, HomeGrupoEstacion>()
+  const mapa = new Map<number, HomeGrupoEstacion>()
 
   for (const estacion of estaciones.value) {
-    let grupo = mapa.get(estacion.tipo_estacion)
+    let grupo = mapa.get(estacion.tipo_estacion_id)
 
     if (!grupo) {
       grupo = {
+        tipoId: estacion.tipo_estacion_id,
         tipo: estacion.tipo_estacion,
         total: 0,
         libres: [],
         ocupadas: [],
         sinEstado: [],
+        enCola: estacion.en_cola_tipo,
+        miEnCola: estacion.mi_en_cola,
+        completo: false,
       }
-      mapa.set(estacion.tipo_estacion, grupo)
+      mapa.set(estacion.tipo_estacion_id, grupo)
     }
 
     grupo.total += 1
+    grupo.enCola = Math.max(grupo.enCola, estacion.en_cola_tipo)
+    grupo.miEnCola = grupo.miEnCola || estacion.mi_en_cola
 
     if (estacion.estado === 'Libre') {
       grupo.libres.push(estacion)
@@ -299,10 +447,15 @@ const grupos = computed<HomeGrupoEstacion[]>(() => {
     grupo.libres.sort(porPoste)
     grupo.ocupadas.sort(porPoste)
     grupo.sinEstado.sort(porPoste)
+    grupo.completo = grupo.ocupadas.length === grupo.total
   }
 
   return [...mapa.values()]
 })
+
+const usuarioEnCola = computed(() =>
+  grupos.value.some((grupo) => grupo.miEnCola),
+)
 </script>
 
 <style scoped>
@@ -615,6 +768,101 @@ const grupos = computed<HomeGrupoEstacion[]>(() => {
   background: rgba(148, 190, 175, 0.06);
 }
 
+.active-session {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: var(--app-radius);
+  border: 1px solid rgba(43, 229, 156, 0.35);
+  background:
+    radial-gradient(
+      460px 160px at 0% 0%,
+      rgba(43, 229, 156, 0.16),
+      transparent 70%
+    ),
+    linear-gradient(135deg, rgba(19, 31, 27, 0.96), rgba(10, 16, 14, 0.9));
+  box-shadow:
+    var(--app-shadow),
+    inset 0 0 0 1px rgba(43, 229, 156, 0.06);
+}
+
+.active-session__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 13px;
+  color: #04120d;
+  background: linear-gradient(145deg, #3cf0a8, #16b97b);
+  box-shadow:
+    0 12px 26px -14px rgba(43, 229, 156, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.active-session__icon ion-icon {
+  font-size: 22px;
+}
+
+.active-session__copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.active-session__eyebrow {
+  margin: 0;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--app-green);
+}
+
+.active-session__copy h2 {
+  margin: 3px 0 0;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--app-text);
+}
+
+.active-session__copy p {
+  margin: 3px 0 0;
+  font-size: 0.78rem;
+  color: var(--app-muted);
+}
+
+.active-session__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  padding: 9px 13px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 176, 32, 0.38);
+  background: rgba(255, 176, 32, 0.09);
+  color: var(--app-amber);
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.active-session__action:hover:not(:disabled) {
+  border-color: rgba(255, 176, 32, 0.6);
+  background: rgba(255, 176, 32, 0.16);
+}
+
+.active-session__action:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.active-session__action svg {
+  width: 17px;
+  height: 17px;
+}
+
 .type-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -775,6 +1023,16 @@ const grupos = computed<HomeGrupoEstacion[]>(() => {
   .login-cta__primary,
   .login-cta__secondary {
     flex: 1;
+  }
+
+  .active-session {
+    flex-wrap: wrap;
+    padding: 14px;
+  }
+
+  .active-session__action {
+    width: 100%;
+    justify-content: center;
   }
 
   .empty {

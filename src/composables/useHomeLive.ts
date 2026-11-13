@@ -46,12 +46,19 @@ export function useHomeLive() {
     const libres = estaciones.value.filter((item) => item.estado === 'Libre').length
     const ocupadas = estaciones.value.filter((item) => item.estado === 'Ocupado').length
 
+    const colaPorTipo = new Map<number, number>()
+    for (const item of estaciones.value) {
+      if (item.en_cola_tipo > 0) {
+        colaPorTipo.set(item.tipo_estacion_id, item.en_cola_tipo)
+      }
+    }
+
     return {
       total,
       libres,
       ocupadas,
       sinEstado: estaciones.value.filter((item) => !item.estado).length,
-      enCola: estaciones.value.reduce((sum, item) => sum + (item.en_cola ?? 0), 0),
+      enCola: [...colaPorTipo.values()].reduce((sum, value) => sum + value, 0),
       cargando: estaciones.value.reduce((sum, item) => sum + (item.cargando ?? 0), 0),
     }
   })
@@ -63,10 +70,22 @@ export function useHomeLive() {
   let channel: RealtimeChannel | null = null
   let channelSeq = 0
   let refreshTimer: ReturnType<typeof setTimeout> | null = null
+  let dayTimer: ReturnType<typeof setInterval> | null = null
   let loadVersion = 0
   let mounted = false
   let paused = false
   let appListener: { remove: () => Promise<void> } | null = null
+
+  function diaMadrid(): string {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Madrid',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date())
+  }
+
+  let currentDay = diaMadrid()
 
   function getErrorMessage(cause: unknown): string {
     if (cause instanceof Error) {
@@ -99,6 +118,8 @@ export function useHomeLive() {
       return
     }
 
+    currentDay = diaMadrid()
+
     if (!silent) {
       loading.value = true
     }
@@ -120,7 +141,7 @@ export function useHomeLive() {
 
       const message = getErrorMessage(cause)
       error.value = isMissingSchemaError(message)
-        ? 'Falta crear las vistas de la Home. Ejecuta supabase/migrations/0001_home.sql y 0003_home_public.sql en el SQL Editor de Supabase.'
+        ? 'Falta crear o actualizar las vistas de la Home. Ejecuta las migraciones 0001_home.sql, 0003_home_public.sql y 0004_gestion_diaria.sql en el SQL Editor de Supabase.'
         : message
     } finally {
       if (version === loadVersion) {
@@ -257,6 +278,19 @@ export function useHomeLive() {
     await load()
     subscribe()
 
+    if (!isPreview) {
+      dayTimer = setInterval(() => {
+        if (paused) return
+
+        const today = diaMadrid()
+        if (today !== currentDay) {
+          currentDay = today
+          toast.value = null
+          void load(true)
+        }
+      }, 60_000)
+    }
+
     document.addEventListener('visibilitychange', onVisibilityChange)
 
     if (Capacitor.isNativePlatform()) {
@@ -273,6 +307,10 @@ export function useHomeLive() {
   onBeforeUnmount(() => {
     mounted = false
     paused = true
+    if (dayTimer) {
+      clearInterval(dayTimer)
+      dayTimer = null
+    }
     document.removeEventListener('visibilitychange', onVisibilityChange)
     void appListener?.remove()
     appListener = null

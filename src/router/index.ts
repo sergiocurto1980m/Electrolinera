@@ -4,6 +4,7 @@ import AccountPage from '@/views/AccountPage.vue'
 import HomePage from '@/views/HomePage.vue'
 import LoginPage from '@/views/LoginPage.vue'
 import RegisterPage from '@/views/RegisterPage.vue'
+import SettingsPage from '@/views/SettingsPage.vue'
 import { useAuth } from '@/composables/useAuth'
 
 const routes: RouteRecordRaw[] = [
@@ -35,6 +36,12 @@ const routes: RouteRecordRaw[] = [
     component: AccountPage,
   },
   {
+    path: '/ajustes',
+    name: 'ajustes',
+    component: SettingsPage,
+    meta: { adminOnly: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/home',
   },
@@ -46,7 +53,7 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  const { initAuth, isAuthenticated } = useAuth()
+  const { initAuth, isAuthenticated, perfil } = useAuth()
   await initAuth()
 
   /*
@@ -76,6 +83,10 @@ router.beforeEach(async (to) => {
 
   if (!isAuthenticated.value) {
     return { name: 'login', query: { redirect: to.fullPath } }
+  }
+
+  if (to.meta.adminOnly && perfil.value?.es_admin !== true) {
+    return { name: 'home' }
   }
 
   return true

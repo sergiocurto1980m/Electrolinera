@@ -92,10 +92,24 @@
           />
         </ion-item>
 
-        <ion-item disabled lines="none" :detail="false" class="menu-link">
+        <ion-item
+          v-if="perfil?.es_admin"
+          router-link="/ajustes"
+          router-direction="forward"
+          :detail="false"
+          lines="none"
+          class="menu-link"
+          :class="{ 'menu-link--active': isSettings }"
+          @click="closeMenu"
+        >
           <ion-icon slot="start" :icon="settingsOutline" aria-hidden="true" />
-          <ion-label>Ajustes</ion-label>
-          <span slot="end" class="menu-link__soon">Pronto</span>
+          <ion-label>Configuración</ion-label>
+          <span
+            v-if="isSettings"
+            slot="end"
+            class="menu-link__active-dot"
+            aria-hidden="true"
+          />
         </ion-item>
       </nav>
     </ion-content>
@@ -145,6 +159,7 @@ const { perfil, initials, signOut } = useAuth()
 
 const isHome = computed(() => route.path === '/home')
 const isAccount = computed(() => route.path === '/cuenta')
+const isSettings = computed(() => route.path === '/ajustes')
 
 async function closeMenu(): Promise<void> {
   try {

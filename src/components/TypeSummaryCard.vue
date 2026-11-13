@@ -19,10 +19,6 @@
         <strong>{{ grupo.ocupadas.length }}</strong>
         <span>Ocupadas</span>
       </div>
-      <div class="metric metric--muted">
-        <strong>{{ grupo.sinEstado.length }}</strong>
-        <span>Sin estado</span>
-      </div>
     </div>
 
     <div v-else class="type-summary__locked">
@@ -40,11 +36,6 @@
         v-if="grupo.ocupadas.length"
         class="bar bar--amber"
         :style="{ flexGrow: grupo.ocupadas.length }"
-      />
-      <span
-        v-if="grupo.sinEstado.length"
-        class="bar bar--muted"
-        :style="{ flexGrow: grupo.sinEstado.length }"
       />
     </div>
   </article>
@@ -140,7 +131,7 @@ withDefaults(
 
 .type-summary__metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 

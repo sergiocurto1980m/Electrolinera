@@ -13,18 +13,55 @@
         <span class="chip chip--amber">
           {{ pluralizar(grupo.ocupadas.length, 'ocupada', 'ocupadas') }}
         </span>
-        <span v-if="grupo.sinEstado.length" class="chip chip--muted">
-          {{ pluralizar(grupo.sinEstado.length, 'sin estado', 'sin estado') }}
-        </span>
+        <span v-if="grupo.completo" class="chip chip--muted">Completo</span>
       </div>
     </header>
 
+    <div
+      v-if="showStatus && (grupo.enCola > 0 || puedeEntrarEnCola)"
+      class="group__queue"
+    >
+      <span v-if="grupo.enCola > 0" class="group__queue-count">
+        {{ grupo.enCola }} en cola
+      </span>
+
+      <template v-if="grupo.miEnCola">
+        <span class="group__queue-you">Estás en la cola</span>
+        <button
+          class="group__queue-btn group__queue-btn--leave"
+          type="button"
+          :disabled="accionando"
+          @click="emit('salirDeCola', grupo)"
+        >
+          Salir de la cola
+        </button>
+      </template>
+
+      <template v-else-if="puedeEntrarEnCola">
+        <span class="group__queue-note">
+          Todos los puestos están ocupados.
+        </span>
+        <button
+          class="group__queue-btn"
+          type="button"
+          :disabled="accionando"
+          @click="emit('entrarEnCola', grupo)"
+        >
+          Ponerse en cola
+        </button>
+      </template>
+
+      <span v-else-if="reservadoPorCola" class="group__queue-note">
+        Puesto reservado a la cola
+      </span>
+    </div>
+
     <template v-if="showStatus">
-      <div
-        class="group__columns"
-        :class="{ 'group__columns--three': grupo.sinEstado.length > 0 }"
-      >
-        <section class="column column--green" :aria-label="`${grupo.tipo}: puestos libres`">
+      <div class="group__columns">
+        <section
+          class="column column--green"
+          :aria-label="`${grupo.tipo}: puestos libres`"
+        >
           <header class="column__head">
             <h4>Libres</h4>
             <span class="column__count">{{ grupo.libres.length }}</span>
@@ -34,12 +71,18 @@
               v-for="estacion in grupo.libres"
               :key="estacion.id"
               :estacion="estacion"
+              :puede-enganchar="puedeEnganchar(estacion)"
+              :accionando="accionando"
+              @engancharse="emit('engancharse', estacion)"
             />
           </div>
           <p v-else class="column__empty">No hay puestos libres</p>
         </section>
 
-        <section class="column column--amber" :aria-label="`${grupo.tipo}: puestos ocupados`">
+        <section
+          class="column column--amber"
+          :aria-label="`${grupo.tipo}: puestos ocupados`"
+        >
           <header class="column__head">
             <h4>Ocupadas</h4>
             <span class="column__count">{{ grupo.ocupadas.length }}</span>
@@ -49,27 +92,12 @@
               v-for="estacion in grupo.ocupadas"
               :key="estacion.id"
               :estacion="estacion"
+              :es-mio="estacion.es_mio"
+              :accionando="accionando"
+              @desengancharse="emit('desengancharse', estacion)"
             />
           </div>
           <p v-else class="column__empty">No hay puestos ocupados</p>
-        </section>
-
-        <section
-          v-if="grupo.sinEstado.length"
-          class="column column--muted"
-          :aria-label="`${grupo.tipo}: puestos sin estado`"
-        >
-          <header class="column__head">
-            <h4>Sin estado</h4>
-            <span class="column__count">{{ grupo.sinEstado.length }}</span>
-          </header>
-          <div class="column__rows">
-            <station-row
-              v-for="estacion in grupo.sinEstado"
-              :key="estacion.id"
-              :estacion="estacion"
-            />
-          </div>
         </section>
       </div>
     </template>
@@ -106,9 +134,24 @@ const props = withDefaults(
   defineProps<{
     grupo: HomeGrupoEstacion
     showStatus?: boolean
+    miEstacionId?: number | null
+    usuarioEnCola?: boolean
+    accionando?: boolean
   }>(),
-  { showStatus: true },
+  {
+    showStatus: true,
+    miEstacionId: null,
+    usuarioEnCola: false,
+    accionando: false,
+  },
 )
+
+const emit = defineEmits<{
+  engancharse: [estacion: HomeEstacion]
+  desengancharse: [estacion: HomeEstacion]
+  entrarEnCola: [grupo: HomeGrupoEstacion]
+  salirDeCola: [grupo: HomeGrupoEstacion]
+}>()
 
 const porPoste = (a: HomeEstacion, b: HomeEstacion) =>
   Number(a.tipo_poste) - Number(b.tipo_poste) ||
@@ -122,6 +165,31 @@ const puestos = computed<HomeEstacion[]>(() =>
     ...props.grupo.sinEstado,
   ].sort(porPoste),
 )
+
+const puedeEntrarEnCola = computed(
+  () =>
+    props.showStatus &&
+    props.miEstacionId === null &&
+    !props.usuarioEnCola &&
+    !props.grupo.miEnCola &&
+    props.grupo.completo,
+)
+
+const reservadoPorCola = computed(
+  () =>
+    props.showStatus &&
+    props.miEstacionId === null &&
+    !props.grupo.miEnCola &&
+    !props.grupo.completo &&
+    props.grupo.enCola > 0,
+)
+
+function puedeEnganchar(estacion: HomeEstacion): boolean {
+  if (!props.showStatus || props.miEstacionId !== null) return false
+  if (estacion.estado === 'Ocupado') return false
+  if (props.grupo.enCola > 0 && !props.grupo.miEnCola) return false
+  return true
+}
 </script>
 
 <style scoped>
@@ -197,14 +265,71 @@ const puestos = computed<HomeEstacion[]>(() =>
   border: 1px solid var(--app-border);
 }
 
+.group__queue {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -2px 0 14px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px dashed rgba(43, 229, 156, 0.22);
+  background: rgba(43, 229, 156, 0.04);
+  font-size: 0.72rem;
+  color: var(--app-muted);
+}
+
+.group__queue-count {
+  font-weight: 650;
+  color: var(--app-green);
+}
+
+.group__queue-you {
+  font-weight: 600;
+  color: var(--app-green);
+}
+
+.group__queue-note {
+  color: var(--app-muted);
+}
+
+.group__queue-btn {
+  margin-left: auto;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(43, 229, 156, 0.3);
+  background: rgba(43, 229, 156, 0.08);
+  color: var(--app-green);
+  font-size: 0.7rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.group__queue-btn:hover:not(:disabled) {
+  border-color: rgba(43, 229, 156, 0.5);
+  background: rgba(43, 229, 156, 0.14);
+}
+
+.group__queue-btn--leave {
+  color: var(--app-amber);
+  border-color: rgba(255, 176, 32, 0.3);
+  background: rgba(255, 176, 32, 0.08);
+}
+
+.group__queue-btn--leave:hover:not(:disabled) {
+  border-color: rgba(255, 176, 32, 0.5);
+  background: rgba(255, 176, 32, 0.14);
+}
+
+.group__queue-btn:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
 .group__columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-}
-
-.group__columns--three {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .group__columns--public {
@@ -225,10 +350,6 @@ const puestos = computed<HomeEstacion[]>(() =>
 
 .column--amber {
   border-color: rgba(255, 176, 32, 0.16);
-}
-
-.column--muted {
-  border-color: rgba(138, 163, 155, 0.14);
 }
 
 .column--public {
@@ -320,13 +441,16 @@ const puestos = computed<HomeEstacion[]>(() =>
     justify-content: flex-start;
   }
 
-  .group__columns,
-  .group__columns--three {
+  .group__columns {
     grid-template-columns: 1fr;
   }
 
   .column__rows--public {
     grid-template-columns: 1fr;
+  }
+
+  .group__queue-btn {
+    margin-left: 0;
   }
 }
 </style>

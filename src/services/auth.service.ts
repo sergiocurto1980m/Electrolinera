@@ -2,7 +2,8 @@ import { supabase } from './supabase'
 import { appUrl } from '@/utils/url'
 import type { UsuarioPerfil } from '@/types/auth'
 
-const PERFIL_COLUMNS = 'id, nombre, email, borrado, created_at'
+const PERFIL_BASE_COLUMNS = 'id, nombre, email, borrado, created_at'
+const PERFIL_COLUMNS = `${PERFIL_BASE_COLUMNS}, es_admin`
 
 function requireClient() {
   if (!supabase) {
@@ -24,9 +25,28 @@ export async function fetchPerfil(
     .eq('id', userId)
     .maybeSingle()
 
-  if (error) throw error
+  if (!error) {
+    return (data as UsuarioPerfil | null) ?? null
+  }
 
-  return (data as UsuarioPerfil | null) ?? null
+  /*
+   * Si la migración 0005 todavía no se ha ejecutado, la columna es_admin no
+   * existe. La app puede seguir funcionando con el perfil base; la sección de
+   * administración quedará oculta hasta aplicar la migración.
+   */
+  const fallback = await client
+    .from('usuarios')
+    .select(PERFIL_BASE_COLUMNS)
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (fallback.error) {
+    throw error
+  }
+
+  return fallback.data
+    ? ({ ...fallback.data, es_admin: false } as UsuarioPerfil)
+    : null
 }
 
 export async function login(email: string, password: string) {

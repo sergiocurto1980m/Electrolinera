@@ -4,9 +4,10 @@ import type { HomeAviso, HomeEstacion, HomeSnapshot } from '@/types/home'
 const AVISOS_LIMIT = 10
 
 const ESTACION_COLUMNS =
-  'id, tipo_estacion, tipo_poste, tipo_toma, estado, estado_desde, en_cola, cargando'
+  'id, tipo_estacion_id, tipo_estacion, tipo_poste, tipo_toma, estado, estado_desde, en_cola_tipo, cargando, es_mio, mi_en_cola'
 
-const ESTACION_PUBLIC_COLUMNS = 'id, tipo_estacion, tipo_poste, tipo_toma'
+const ESTACION_PUBLIC_COLUMNS =
+  'id, tipo_estacion_id, tipo_estacion, tipo_poste, tipo_toma'
 
 export function isMissingSchemaError(message: string): boolean {
   return (
@@ -48,24 +49,32 @@ export async function fetchEstaciones(
 
   type EstacionRow = Pick<
     HomeEstacion,
-    'id' | 'tipo_estacion' | 'tipo_poste' | 'tipo_toma'
+    'id' | 'tipo_estacion_id' | 'tipo_estacion' | 'tipo_poste' | 'tipo_toma'
   > &
     Partial<
       Pick<
         HomeEstacion,
-        'estado' | 'estado_desde' | 'en_cola' | 'cargando'
+        | 'estado'
+        | 'estado_desde'
+        | 'en_cola_tipo'
+        | 'cargando'
+        | 'es_mio'
+        | 'mi_en_cola'
       >
     >
 
   return ((data ?? []) as unknown as EstacionRow[]).map((row) => ({
     id: row.id,
+    tipo_estacion_id: row.tipo_estacion_id,
     tipo_estacion: row.tipo_estacion,
     tipo_poste: row.tipo_poste,
     tipo_toma: row.tipo_toma,
     estado: row.estado ?? null,
     estado_desde: row.estado_desde ?? null,
-    en_cola: row.en_cola ?? 0,
+    en_cola_tipo: row.en_cola_tipo ?? 0,
     cargando: row.cargando ?? 0,
+    es_mio: row.es_mio ?? false,
+    mi_en_cola: row.mi_en_cola ?? false,
   }))
 }
 

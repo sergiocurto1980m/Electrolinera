@@ -27,9 +27,11 @@
         <div class="aviso__body">
           <p class="aviso__text">{{ aviso.aviso }}</p>
           <p class="aviso__meta">
-            {{ aviso.tipo_estacion }} · Poste {{ aviso.tipo_poste }} · Toma
-            {{ aviso.tipo_toma }}
-            <span aria-hidden="true">·</span>
+            {{ aviso.tipo_estacion }}
+            <template v-if="aviso.tipo_poste && aviso.tipo_toma">
+              · Poste {{ aviso.tipo_poste }} · Toma {{ aviso.tipo_toma }}
+            </template>
+            <span aria-hidden="true"> · </span>
             <time :datetime="aviso.fecha_hora">{{ formatFechaHora(aviso.fecha_hora) }}</time>
           </p>
         </div>

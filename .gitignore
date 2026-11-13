@@ -28,3 +28,5 @@ android/capacitor-cordova-android-plugins/build/
 
 coverage/
 *.tsbuildinfo
+
+supabase/.temp/

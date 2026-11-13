@@ -4,6 +4,7 @@ export interface UsuarioPerfil {
   email: string
   borrado: boolean
   created_at: string
+  es_admin: boolean
 }
 
 export interface ResultadoCambioEmail {
