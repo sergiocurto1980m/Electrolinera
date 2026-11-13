@@ -1,0 +1,229 @@
+<template>
+  <article class="type-summary">
+    <header class="type-summary__head">
+      <div class="type-summary__title">
+        <h3>{{ grupo.tipo }}</h3>
+        <p>{{ pluralizar(grupo.total, 'puesto', 'puestos') }}</p>
+      </div>
+      <span class="type-summary__icon" aria-hidden="true">
+        <ion-icon :icon="showStatus ? flashOutline : lockClosedOutline" />
+      </span>
+    </header>
+
+    <div v-if="showStatus" class="type-summary__metrics">
+      <div class="metric metric--green">
+        <strong>{{ grupo.libres.length }}</strong>
+        <span>Libres</span>
+      </div>
+      <div class="metric metric--amber">
+        <strong>{{ grupo.ocupadas.length }}</strong>
+        <span>Ocupadas</span>
+      </div>
+      <div class="metric metric--muted">
+        <strong>{{ grupo.sinEstado.length }}</strong>
+        <span>Sin estado</span>
+      </div>
+    </div>
+
+    <div v-else class="type-summary__locked">
+      <ion-icon :icon="lockClosedOutline" aria-hidden="true" />
+      <span>Inicia sesión para ver el estado</span>
+    </div>
+
+    <div v-if="showStatus" class="type-summary__bar" aria-hidden="true">
+      <span
+        v-if="grupo.libres.length"
+        class="bar bar--green"
+        :style="{ flexGrow: grupo.libres.length }"
+      />
+      <span
+        v-if="grupo.ocupadas.length"
+        class="bar bar--amber"
+        :style="{ flexGrow: grupo.ocupadas.length }"
+      />
+      <span
+        v-if="grupo.sinEstado.length"
+        class="bar bar--muted"
+        :style="{ flexGrow: grupo.sinEstado.length }"
+      />
+    </div>
+  </article>
+</template>
+
+<script setup lang="ts">
+import { IonIcon } from '@ionic/vue'
+import { flashOutline, lockClosedOutline } from 'ionicons/icons'
+import { pluralizar } from '@/utils/format'
+import type { HomeGrupoEstacion } from '@/types/home'
+
+withDefaults(
+  defineProps<{
+    grupo: HomeGrupoEstacion
+    showStatus?: boolean
+  }>(),
+  { showStatus: true },
+)
+</script>
+
+<style scoped>
+.type-summary {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+  border-radius: var(--app-radius);
+  border: 1px solid var(--app-border);
+  background: linear-gradient(
+    160deg,
+    rgba(19, 31, 27, 0.95),
+    rgba(10, 16, 14, 0.86)
+  );
+  box-shadow: var(--app-shadow);
+  overflow: hidden;
+}
+
+.type-summary::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(43, 229, 156, 0.55),
+    transparent
+  );
+}
+
+.type-summary__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.type-summary__title {
+  min-width: 0;
+}
+
+.type-summary__title h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--app-text);
+}
+
+.type-summary__title p {
+  margin: 2px 0 0;
+  font-size: 0.74rem;
+  color: var(--app-muted);
+}
+
+.type-summary__icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 11px;
+  color: var(--app-green);
+  background: rgba(43, 229, 156, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(43, 229, 156, 0.22);
+}
+
+.type-summary__icon ion-icon {
+  font-size: 19px;
+}
+
+.type-summary__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.type-summary__locked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px dashed var(--app-border);
+  background: rgba(148, 190, 175, 0.04);
+  color: var(--app-muted);
+  font-size: 0.74rem;
+  font-weight: 550;
+  line-height: 1.4;
+}
+
+.type-summary__locked ion-icon {
+  flex: none;
+  font-size: 16px;
+  color: var(--app-dim);
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.metric strong {
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric span {
+  font-size: 0.64rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+  white-space: nowrap;
+}
+
+.metric--green strong {
+  color: var(--app-green);
+}
+
+.metric--amber strong {
+  color: var(--app-amber);
+}
+
+.metric--muted strong {
+  color: var(--app-muted);
+}
+
+.type-summary__bar {
+  display: flex;
+  gap: 3px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(148, 190, 175, 0.12);
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  min-width: 4px;
+  flex-basis: 0;
+  border-radius: 999px;
+}
+
+.bar--green {
+  background: var(--app-green);
+}
+
+.bar--amber {
+  background: var(--app-amber);
+}
+
+.bar--muted {
+  background: var(--app-dim);
+}
+</style>

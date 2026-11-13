@@ -1,0 +1,7 @@
+{
+  "name": "Electrolinera",
+  "type": "vue",
+  "integrations": {
+    "capacitor": {}
+  }
+}
