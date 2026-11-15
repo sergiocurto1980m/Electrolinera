@@ -181,6 +181,7 @@ function puedeEnganchar(estacion: HomeEstacion): boolean {
 <style scoped>
 .group {
   min-width: 0;
+  scroll-margin-top: 12px;
   padding: 18px;
   border-radius: var(--app-radius);
   border: 1px solid var(--app-border);

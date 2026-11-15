@@ -220,6 +220,7 @@
             :grupo="grupo"
             :show-status="isAuthenticated"
             :accionando="accionando"
+            @ver-detalle="irAlDetalle"
             @entrar-en-cola="onEntrarEnCola"
             @salir-de-cola="onSalirDeCola"
           />
@@ -262,6 +263,7 @@
           <div v-else class="group-list">
             <station-group
               v-for="grupo in grupos"
+              :id="`grupo-${grupo.tipoId}`"
               :key="grupo.tipoId"
               :grupo="grupo"
               :show-status="isAuthenticated"
@@ -536,6 +538,13 @@ function onSalirDeCola(grupo: HomeGrupoEstacion): void {
     () => salirDeCola(grupo.tipoId),
     `Has salido de la cola de ${grupo.tipo}.`,
   )
+}
+
+/* Desde el resumen de un tipo se salta a su bloque de detalle. */
+function irAlDetalle(grupo: HomeGrupoEstacion): void {
+  const destino = document.getElementById(`grupo-${grupo.tipoId}`)
+
+  destino?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 const subtitle = computed(() => {

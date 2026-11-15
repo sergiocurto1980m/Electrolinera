@@ -242,6 +242,8 @@ completo con los datos de ejemplo.
 
 ### Home pública y estado privado
 
+- **Resumen por tipo**: el nombre de cada tarjeta (y su enlace **Ver detalle**)
+  desplaza la vista al bloque de puestos de ese tipo.
 - **Invitado**:
   - Ve las estaciones agrupadas por tipo, con el total de puestos.
   - No ve libres/ocupadas, tiempo, cola ni avisos.

@@ -1,10 +1,21 @@
 <template>
   <article class="type-summary">
     <header class="type-summary__head">
-      <div class="type-summary__title">
+      <a
+        class="type-summary__title"
+        :href="`#grupo-${grupo.tipoId}`"
+        :aria-label="`Ver el detalle de ${grupo.tipo}`"
+        @click.prevent="emit('verDetalle', grupo)"
+      >
         <h3>{{ grupo.tipo }}</h3>
-        <p>{{ pluralizar(grupo.total, 'puesto', 'puestos') }}</p>
-      </div>
+        <p>
+          {{ pluralizar(grupo.total, 'puesto', 'puestos') }}
+          <span class="type-summary__open">
+            Ver detalle
+            <ion-icon :icon="chevronDownOutline" aria-hidden="true" />
+          </span>
+        </p>
+      </a>
       <span class="type-summary__icon" aria-hidden="true">
         <ion-icon :icon="showStatus ? flashOutline : lockClosedOutline" />
       </span>
@@ -70,7 +81,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { IonIcon } from '@ionic/vue'
-import { flashOutline, lockClosedOutline, timeOutline } from 'ionicons/icons'
+import {
+  chevronDownOutline,
+  flashOutline,
+  lockClosedOutline,
+  timeOutline,
+} from 'ionicons/icons'
 import { pluralizar } from '@/utils/format'
 import type { HomeGrupoEstacion } from '@/types/home'
 
@@ -84,6 +100,7 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
+  verDetalle: [grupo: HomeGrupoEstacion]
   entrarEnCola: [grupo: HomeGrupoEstacion]
   salirDeCola: [grupo: HomeGrupoEstacion]
 }>()
@@ -146,7 +163,35 @@ const puedeSalirDeCola = computed(
 }
 
 .type-summary__title {
+  display: block;
   min-width: 0;
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.type-summary__title:focus-visible {
+  outline: 2px solid var(--app-green);
+  outline-offset: 3px;
+}
+
+.type-summary__title:hover h3 {
+  color: var(--app-green);
+}
+
+.type-summary__open {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 5px;
+  color: var(--app-green);
+  font-size: 0.7rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.type-summary__open ion-icon {
+  font-size: 13px;
 }
 
 .type-summary__title h3 {
