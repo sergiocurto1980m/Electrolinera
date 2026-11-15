@@ -180,7 +180,43 @@
             </div>
 
             <div
-              v-if="!miEstacion && misColas.length === 0"
+              v-for="toma in tomasMarcadas"
+              :key="`marcada-${toma.id}`"
+              class="user-status__item user-status__item--marcada"
+            >
+              <span class="user-status__icon" aria-hidden="true">
+                <ion-icon :icon="estadoIcons.marcada" />
+              </span>
+
+              <div class="user-status__body">
+                <p class="user-status__label">Has marcado una toma</p>
+                <p class="user-status__detail">
+                  Estación {{ toma.tipo_estacion }} · Poste
+                  {{ toma.tipo_poste }} · Toma {{ toma.tipo_toma }}
+                </p>
+                <p class="user-status__hint">
+                  Ocupada por otra persona sin app. Puedes marcarla libre
+                  cuando se desocupe.
+                </p>
+              </div>
+
+              <button
+                class="user-status__action"
+                type="button"
+                :disabled="accionando"
+                @click="onDesengancharse(toma)"
+              >
+                <unplug-icon />
+                <span>{{ accionando ? 'Liberando…' : 'Marcar libre' }}</span>
+              </button>
+            </div>
+
+            <div
+              v-if="
+                !miEstacion &&
+                misColas.length === 0 &&
+                tomasMarcadas.length === 0
+              "
               class="user-status__item user-status__item--libre"
             >
               <span class="user-status__icon" aria-hidden="true">
@@ -275,6 +311,7 @@
               :accionando="accionando"
               @engancharse="onEngancharse"
               @desengancharse="onDesengancharse"
+              @marcar-por-otro="onMarcarPorOtro"
               @entrar-en-cola="onEntrarEnCola"
               @salir-de-cola="onSalirDeCola"
             />
@@ -353,6 +390,7 @@ import {
   checkmarkCircleOutline,
   flashOutline,
   lockClosedOutline,
+  personOutline,
   refreshOutline,
   timeOutline,
   warningOutline,
@@ -369,6 +407,7 @@ import {
   desengancharse,
   engancharse,
   entrarEnCola,
+  marcarOcupadaPorOtro,
   salirDeCola,
 } from '@/services/estacion.service'
 import { formatHora } from '@/utils/format'
@@ -437,6 +476,11 @@ const confirmButtons = computed<AlertButton[]>(() => {
 
 const miEstacion = computed(
   () => estaciones.value.find((estacion) => estacion.es_mio) ?? null,
+)
+
+/* Tomas ocupadas por personas sin app que este usuario ha registrado. */
+const tomasMarcadas = computed(() =>
+  estaciones.value.filter((estacion) => estacion.marcada_por_mi),
 )
 
 function getActionError(cause: unknown): string {
@@ -515,7 +559,39 @@ function onEngancharse(estacion: HomeEstacion): void {
   }
 }
 
+function onMarcarPorOtro(estacion: HomeEstacion): void {
+  pendingConfirm.value = {
+    header: 'Marcar toma ocupada',
+    message: `Estación ${estacion.tipo_estacion}: vas a marcar el Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma} como ocupado por otra persona sin app. Tú no quedarás enganchado. ¿Quieres continuar?`,
+    confirmText: 'Marcar ocupada',
+    run: () => {
+      void runAction(
+        () => marcarOcupadaPorOtro(estacion.id),
+        `Has marcado el Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma} como ocupado por otra persona.`,
+      )
+    },
+  }
+}
+
 function onDesengancharse(estacion: HomeEstacion): void {
+  const esOcupacionAjena = estacion.ocupada_por_otro && !estacion.es_mio
+
+  if (esOcupacionAjena) {
+    pendingConfirm.value = {
+      header: 'Marcar toma libre',
+      message: `Estación ${estacion.tipo_estacion}: vas a marcar el Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma} como libre. Estaba ocupado por otra persona sin app. ¿Quieres continuar?`,
+      confirmText: 'Marcar libre',
+      destructive: true,
+      run: () => {
+        void runAction(
+          () => desengancharse(estacion.id),
+          `Has marcado el Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma} como libre.`,
+        )
+      },
+    }
+    return
+  }
+
   pendingConfirm.value = {
     header: 'Desengancharse del puesto',
     message: `Estación ${estacion.tipo_estacion}: vas a desengancharte del Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma}. El puesto quedará libre y perderás tu sitio. ¿Quieres continuar?`,
@@ -680,6 +756,7 @@ const estadoIcons = {
   cola: timeOutline,
   libre: checkmarkCircleOutline,
   comprobando: timeOutline,
+  marcada: personOutline,
 }
 
 function desengancharDesdeIndicador(): void {
@@ -1055,6 +1132,14 @@ function salirDeColaDesdeIndicador(grupo: HomeGrupoEstacion): void {
   );
 }
 
+.user-status__item--marcada {
+  background: linear-gradient(
+    90deg,
+    rgba(34, 211, 238, 0.07),
+    transparent 65%
+  );
+}
+
 .user-status__icon {
   display: grid;
   place-items: center;
@@ -1129,6 +1214,16 @@ function salirDeColaDesdeIndicador(grupo: HomeGrupoEstacion): void {
 }
 
 .user-status__item--comprobando .user-status__label {
+  color: var(--app-cyan);
+}
+
+.user-status__item--marcada .user-status__icon {
+  color: var(--app-cyan);
+  border-color: rgba(34, 211, 238, 0.28);
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.user-status__item--marcada .user-status__label {
   color: var(--app-cyan);
 }
 

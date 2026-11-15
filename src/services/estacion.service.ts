@@ -20,6 +20,17 @@ export async function engancharse(estacionId: number) {
   return data
 }
 
+export async function marcarOcupadaPorOtro(estacionId: number) {
+  const client = requireClient()
+  const { data, error } = await client.rpc('marcar_ocupada_por_otro', {
+    p_estacion_id: estacionId,
+  })
+
+  if (error) throw error
+
+  return data
+}
+
 export async function desengancharse(estacionId: number) {
   const client = requireClient()
   const { data, error } = await client.rpc('desengancharse', {

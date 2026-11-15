@@ -12,6 +12,9 @@
         <span aria-hidden="true">·</span>
         Toma {{ estacion.tipo_toma }}
         <span v-if="esMio" class="station-row__mine">Tu puesto</span>
+        <span v-else-if="ocupadaPorOtro" class="station-row__other">
+          {{ marcadaPorMi ? 'La marcaste tú' : 'Ocupada por otra persona' }}
+        </span>
       </p>
 
       <p v-if="showStatus" class="station-row__meta">
@@ -31,30 +34,64 @@
       </p>
     </div>
 
-    <div v-if="showStatus && (esMio || puedeEnganchar)" class="station-row__actions">
-      <button
-        v-if="esMio"
-        class="row-action row-action--unplug"
-        type="button"
-        data-tooltip="Desengancharse"
-        aria-label="Desengancharse"
-        :disabled="accionando"
-        @click="emit('desengancharse')"
-      >
-        <unplug-icon />
-      </button>
+    <div
+      v-if="
+        showStatus &&
+        (esMio || ocupadaPorOtro || puedeEnganchar || puedeMarcarPorOtro)
+      "
+      class="station-row__actions"
+    >
+      <template v-if="esMio">
+        <button
+          class="row-action row-action--unplug"
+          type="button"
+          data-tooltip="Desengancharse"
+          aria-label="Desengancharse"
+          :disabled="accionando"
+          @click="emit('desengancharse')"
+        >
+          <unplug-icon />
+        </button>
+      </template>
 
-      <button
-        v-else
-        class="row-action row-action--plug"
-        type="button"
-        data-tooltip="Engancharse"
-        aria-label="Engancharse"
-        :disabled="accionando"
-        @click="emit('engancharse')"
-      >
-        <plug-zap-icon />
-      </button>
+      <template v-else-if="ocupadaPorOtro">
+        <button
+          class="row-action row-action--unplug"
+          type="button"
+          data-tooltip="Marcar libre"
+          aria-label="Marcar la toma como libre"
+          :disabled="accionando"
+          @click="emit('desengancharse')"
+        >
+          <unplug-icon />
+        </button>
+      </template>
+
+      <template v-else>
+        <button
+          v-if="puedeMarcarPorOtro"
+          class="row-action row-action--other"
+          type="button"
+          data-tooltip="Ocupada por otra persona"
+          aria-label="Marcar la toma como ocupada por otra persona"
+          :disabled="accionando"
+          @click="emit('marcarPorOtro')"
+        >
+          <ion-icon :icon="personOutline" aria-hidden="true" />
+        </button>
+
+        <button
+          v-if="puedeEnganchar"
+          class="row-action row-action--plug"
+          type="button"
+          data-tooltip="Engancharse"
+          aria-label="Engancharse"
+          :disabled="accionando"
+          @click="emit('engancharse')"
+        >
+          <plug-zap-icon />
+        </button>
+      </template>
     </div>
   </article>
 </template>
@@ -62,7 +99,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { IonIcon } from '@ionic/vue'
-import { batteryChargingOutline, timeOutline } from 'ionicons/icons'
+import {
+  batteryChargingOutline,
+  personOutline,
+  timeOutline,
+} from 'ionicons/icons'
 import PlugZapIcon from '@/components/icons/PlugZapIcon.vue'
 import UnplugIcon from '@/components/icons/UnplugIcon.vue'
 import { formatDesde } from '@/utils/format'
@@ -73,13 +114,19 @@ const props = withDefaults(
     estacion: HomeEstacion
     showStatus?: boolean
     esMio?: boolean
+    marcadaPorMi?: boolean
+    ocupadaPorOtro?: boolean
     puedeEnganchar?: boolean
+    puedeMarcarPorOtro?: boolean
     accionando?: boolean
   }>(),
   {
     showStatus: true,
     esMio: false,
+    marcadaPorMi: false,
+    ocupadaPorOtro: false,
     puedeEnganchar: false,
+    puedeMarcarPorOtro: false,
     accionando: false,
   },
 )
@@ -87,6 +134,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   engancharse: []
   desengancharse: []
+  marcarPorOtro: []
 }>()
 
 const tone = computed(() => {
@@ -118,7 +166,11 @@ const ariaLabel = computed(() => {
     return `Poste ${props.estacion.tipo_poste}, toma ${props.estacion.tipo_toma}`
   }
 
-  const estado = props.esMio ? 'tu puesto' : estadoLabel.value
+  const estado = props.esMio
+    ? 'tu puesto'
+    : props.ocupadaPorOtro
+      ? 'ocupada por otra persona'
+      : estadoLabel.value
   return `Poste ${props.estacion.tipo_poste}, toma ${props.estacion.tipo_toma}: ${estado}`
 })
 </script>
@@ -206,6 +258,21 @@ const ariaLabel = computed(() => {
   vertical-align: 1px;
 }
 
+.station-row__other {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 176, 32, 0.28);
+  background: rgba(255, 176, 32, 0.1);
+  color: var(--app-amber);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
 .station-row__meta {
   display: flex;
   flex-wrap: wrap;
@@ -267,6 +334,7 @@ const ariaLabel = computed(() => {
 .station-row__actions {
   display: flex;
   align-items: center;
+  gap: 4px;
   flex: none;
 }
 
@@ -311,6 +379,21 @@ const ariaLabel = computed(() => {
 .row-action--unplug:hover:not(:disabled) {
   border-color: rgba(255, 176, 32, 0.55);
   background: rgba(255, 176, 32, 0.16);
+}
+
+.row-action--other {
+  color: var(--app-cyan);
+  border-color: rgba(34, 211, 238, 0.28);
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.row-action--other:hover:not(:disabled) {
+  border-color: rgba(34, 211, 238, 0.55);
+  background: rgba(34, 211, 238, 0.16);
+}
+
+.row-action--other ion-icon {
+  font-size: 18px;
 }
 
 .row-action::after {

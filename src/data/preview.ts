@@ -19,6 +19,8 @@ export const previewEstaciones: HomeEstacion[] = [
     cargando: 1,
     es_mio: false,
     mi_en_cola: false,
+    marcada_por_mi: false,
+    ocupada_por_otro: false,
   },
   {
     id: 2,
@@ -32,6 +34,8 @@ export const previewEstaciones: HomeEstacion[] = [
     cargando: 0,
     es_mio: false,
     mi_en_cola: false,
+    marcada_por_mi: false,
+    ocupada_por_otro: false,
   },
   {
     id: 3,
@@ -45,6 +49,8 @@ export const previewEstaciones: HomeEstacion[] = [
     cargando: 1,
     es_mio: false,
     mi_en_cola: false,
+    marcada_por_mi: false,
+    ocupada_por_otro: false,
   },
   {
     id: 4,
@@ -58,6 +64,8 @@ export const previewEstaciones: HomeEstacion[] = [
     cargando: 1,
     es_mio: false,
     mi_en_cola: false,
+    marcada_por_mi: false,
+    ocupada_por_otro: false,
   },
   {
     id: 5,
@@ -71,6 +79,8 @@ export const previewEstaciones: HomeEstacion[] = [
     cargando: 1,
     es_mio: false,
     mi_en_cola: false,
+    marcada_por_mi: false,
+    ocupada_por_otro: false,
   },
   {
     id: 6,
@@ -84,6 +94,8 @@ export const previewEstaciones: HomeEstacion[] = [
     cargando: 1,
     es_mio: false,
     mi_en_cola: false,
+    marcada_por_mi: false,
+    ocupada_por_otro: false,
   },
   {
     id: 7,
@@ -97,6 +109,8 @@ export const previewEstaciones: HomeEstacion[] = [
     cargando: 0,
     es_mio: false,
     mi_en_cola: false,
+    marcada_por_mi: false,
+    ocupada_por_otro: false,
   },
   {
     id: 8,
@@ -110,6 +124,8 @@ export const previewEstaciones: HomeEstacion[] = [
     cargando: 1,
     es_mio: false,
     mi_en_cola: false,
+    marcada_por_mi: false,
+    ocupada_por_otro: false,
   },
 ]
 

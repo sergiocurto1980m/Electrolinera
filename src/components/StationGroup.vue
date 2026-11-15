@@ -41,10 +41,14 @@
             :estacion="estacion"
             :show-status="showStatus"
             :es-mio="estacion.es_mio"
+            :marcada-por-mi="estacion.marcada_por_mi"
+            :ocupada-por-otro="estacion.ocupada_por_otro"
             :puede-enganchar="puedeEnganchar(estacion)"
+            :puede-marcar-por-otro="puedeMarcarPorOtro(estacion)"
             :accionando="accionando"
             @engancharse="emit('engancharse', estacion)"
             @desengancharse="emit('desengancharse', estacion)"
+            @marcar-por-otro="emit('marcarPorOtro', estacion)"
           />
         </div>
       </section>
@@ -144,6 +148,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   engancharse: [estacion: HomeEstacion]
   desengancharse: [estacion: HomeEstacion]
+  marcarPorOtro: [estacion: HomeEstacion]
   entrarEnCola: [grupo: HomeGrupoEstacion]
   salirDeCola: [grupo: HomeGrupoEstacion]
 }>()
@@ -187,6 +192,16 @@ function puedeEnganchar(estacion: HomeEstacion): boolean {
   if (estacion.estado === 'Ocupado') return false
   if (props.grupo.enCola > 0 && !props.grupo.miEnCola) return false
   return true
+}
+
+/*
+ * Marcar una toma para otra persona refleja la realidad física de la
+ * estación. No exige estar en la cola ni impide hacerlo mientras el usuario
+ * ocupa otro puesto.
+ */
+function puedeMarcarPorOtro(estacion: HomeEstacion): boolean {
+  if (!props.showStatus) return false
+  return estacion.estado !== 'Ocupado'
 }
 </script>
 

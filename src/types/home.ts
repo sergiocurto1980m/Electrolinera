@@ -12,6 +12,8 @@ export interface HomeEstacion {
   cargando: number
   es_mio: boolean
   mi_en_cola: boolean
+  marcada_por_mi: boolean
+  ocupada_por_otro: boolean
 }
 
 export interface HomeAviso {

@@ -9,7 +9,7 @@ import type {
 const AVISOS_LIMIT = 10
 
 const ESTACION_COLUMNS =
-  'id, tipo_estacion_id, tipo_estacion, tipo_poste, tipo_toma, estado, estado_desde, en_cola_tipo, cargando, es_mio, mi_en_cola'
+  'id, tipo_estacion_id, tipo_estacion, tipo_poste, tipo_toma, estado, estado_desde, en_cola_tipo, cargando, es_mio, mi_en_cola, marcada_por_mi, ocupada_por_otro'
 
 const ESTACION_PUBLIC_COLUMNS =
   'id, tipo_estacion_id, tipo_estacion, tipo_poste, tipo_toma'
@@ -67,6 +67,8 @@ export async function fetchEstaciones(
         | 'cargando'
         | 'es_mio'
         | 'mi_en_cola'
+        | 'marcada_por_mi'
+        | 'ocupada_por_otro'
       >
     >
 
@@ -82,6 +84,8 @@ export async function fetchEstaciones(
     cargando: row.cargando ?? 0,
     es_mio: row.es_mio ?? false,
     mi_en_cola: row.mi_en_cola ?? false,
+    marcada_por_mi: row.marcada_por_mi ?? false,
+    ocupada_por_otro: row.ocupada_por_otro ?? false,
   }))
 }
 

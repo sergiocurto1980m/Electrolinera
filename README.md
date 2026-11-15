@@ -73,6 +73,7 @@ Ejecuta en **Supabase → SQL Editor**, en este orden:
 6. [`supabase/migrations/0006_home_cola.sql`](supabase/migrations/0006_home_cola.sql)
 7. [`supabase/migrations/0007_aviso_enganche.sql`](supabase/migrations/0007_aviso_enganche.sql)
 8. [`supabase/migrations/0008_cola_multiple.sql`](supabase/migrations/0008_cola_multiple.sql)
+9. [`supabase/migrations/0009_tomas_sin_app.sql`](supabase/migrations/0009_tomas_sin_app.sql)
 
 La primera prepara la Home:
 
@@ -142,6 +143,18 @@ La octava permite combinar carga y colas:
    siguen activas.
 3. No se permite apuntarse a la cola del tipo en el que ya se está cargando.
 4. La cola sigue exigiendo que todos los postes del tipo estén ocupados.
+
+La novena permite ocupar tomas para personas que no usan la app:
+
+1. Separa quién registra el cambio (`usuario_id`) de quién ocupa realmente
+   (`usuario_ocupante_id`). Un ocupante `NULL` no tiene cuenta en la app.
+2. Cualquier usuario autenticado puede marcar una toma libre como ocupada por
+   otra persona.
+3. Cualquier usuario autenticado puede marcar como libre una toma ocupada por
+   alguien sin app. La ocupación de un usuario registrado solo la libera ese
+   usuario.
+4. Un usuario puede marcar varias tomas para otros, incluso mientras ocupa una
+   él mismo, y esto no le saca de ninguna cola.
 
 > El bloqueo del estado no es solo visual: un invitado tampoco puede leerlo
 > llamando directamente a la API de Supabase.
@@ -254,17 +267,25 @@ completo con los datos de ejemplo.
   - Ve el estado diario completo y los avisos en tiempo real.
   - Tiene un indicador de su situación: **Estás cargando** (estación, poste y
     toma), una fila **En lista de espera** por cada cola (estación y posición),
-    o **Sin actividad**. Carga y colas pueden mostrarse a la vez. Solo aparece
-    con sesión iniciada y se actualiza con Realtime.
+    una fila **Has marcado una toma** por cada toma ocupada por alguien sin app,
+    o **Sin actividad**. Solo aparece con sesión iniciada y se actualiza con
+    Realtime.
   - Puede engancharse a un poste libre y desengancharse del suyo.
+  - Puede marcar una toma libre como **ocupada por otra persona** que no usa
+    la app, y marcarla libre después. Estas tomas aparecen en su panel de
+    estado como **Has marcado una toma**.
   - Puede apuntarse a la cola de un tipo cuando todos sus postes están ocupados.
   - Dispone del menú lateral y del acceso a `Mi cuenta` desde el header.
 - **Enganche**:
   - Un poste sin registros hoy cuenta como `Libre`.
-  - Solo puede haber un poste activo por usuario y día.
+  - Solo puede haber un puesto ocupado por el mismo usuario y día. Las tomas
+    marcadas para personas sin app no cuentan como ocupación propia.
   - Mientras está enganchado, solo puede desengancharse de ese poste.
   - Al desengancharse, el poste vuelve a estar libre y puede volver a
     engancharse el mismo día.
+  - Una toma puede marcarse como ocupada por una persona sin app. En ese caso
+    el ocupante registrado es `NULL` y cualquiera puede volver a marcarla
+    libre. El usuario que la marca no queda enganchado ni sale de la cola.
 - **Cola**:
   - Solo se permite cuando el tipo está completo.
   - Un usuario puede estar en varias colas a la vez (una por tipo), incluso
@@ -279,7 +300,8 @@ completo con los datos de ejemplo.
   - Al engancharse a un puesto solo se cierra la cola de ese tipo; las colas
     de otros tipos se mantienen.
   - Con una cola activa, solo los usuarios apuntados a esa cola pueden
-    engancharse a un poste libre del tipo.
+    engancharse a un poste libre del tipo. Marcar una toma para otra persona no
+    está limitado por la cola.
   - Al liberarse un poste se avisa a los tres primeros de la cola.
 - **Logout**: vuelve a la Home pública, sin salir de la pantalla de inicio.
 - **Realtime**:
@@ -422,7 +444,8 @@ supabase/
    ├─ 0005_admin_config.sql
    ├─ 0006_home_cola.sql
    ├─ 0007_aviso_enganche.sql
-   └─ 0008_cola_multiple.sql
+   ├─ 0008_cola_multiple.sql
+   └─ 0009_tomas_sin_app.sql
 ```
 
 ## Modelo de datos
@@ -439,8 +462,10 @@ tipo_toma ─────┘                          (histórico)
 
 - `estaciones` representa un punto físico: tipo de estación + poste + toma.
 - `situacion_estacion` guarda el histórico diario de estados (`Libre` /
-  `Ocupado`), el usuario que realizó el cambio, el día y si la ocupación está
-  activa.
+  `Ocupado`), el usuario que realizó el cambio, el ocupante real, el día y si
+  la ocupación está activa. `usuario_id` es quien registra el cambio y
+  `usuario_ocupante_id` es quien ocupa. Si el ocupante es `NULL`, la toma está
+  siendo usada por alguien sin cuenta en la app.
 - `lista_espera_estacion` guarda la cola por tipo y día. Las entradas de cola
   no llevan una estación concreta; se activan cuando el tipo está completo. Un
   usuario puede tener una entrada activa por tipo y día, además de estar
@@ -529,6 +554,9 @@ El APK queda en `android/app/build/outputs/apk/debug/app-debug.apk`.
 - La ocupación y la cola se escriben solo mediante RPC con `security definer`;
   el cliente no puede insertar directamente en `situacion_estacion`,
   `lista_espera_estacion` ni `avisos`.
+- Las tomas ocupadas por personas sin app se registran con
+  `usuario_ocupante_id = NULL`. Cualquier usuario autenticado puede marcarlas
+  libres; las de usuarios registrados solo las libera su ocupante.
 - Los avisos tienen RLS por usuario: cada persona solo ve y recibe los suyos.
 - Nunca incluyas `sb_secret_...` en `.env.local` ni en el repositorio.
 - Si una secret key se ha compartido, revócala en **Project Settings → API Keys**.
