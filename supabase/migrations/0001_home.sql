@@ -22,7 +22,7 @@ grant select on
   public.situacion_estacion,
   public.lista_espera_estacion,
   public.avisos
-to anon, authenticated;  
+to anon, authenticated;    
 
 -- 2) Políticas RLS de solo lectura -------------------------------------------
 do $$ 
