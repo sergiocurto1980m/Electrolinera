@@ -1,21 +1,22 @@
 <template>
   <article class="type-summary">
     <header class="type-summary__head">
-      <a
+      <component
+        :is="showStatus ? 'a' : 'div'"
         class="type-summary__title"
-        :href="`#grupo-${grupo.tipoId}`"
-        :aria-label="`Ver el detalle de ${grupo.tipo}`"
-        @click.prevent="emit('verDetalle', grupo)"
+        :href="showStatus ? `#grupo-${grupo.tipoId}` : undefined"
+        :aria-label="showStatus ? `Ver el detalle de ${grupo.tipo}` : undefined"
+        @click.prevent="onVerDetalle"
       >
         <h3>{{ grupo.tipo }}</h3>
         <p>
           {{ pluralizar(grupo.total, 'puesto', 'puestos') }}
-          <span class="type-summary__open">
+          <span v-if="showStatus" class="type-summary__open">
             Ver detalle
             <ion-icon :icon="chevronDownOutline" aria-hidden="true" />
           </span>
         </p>
-      </a>
+      </component>
       <span class="type-summary__icon" aria-hidden="true">
         <ion-icon :icon="showStatus ? flashOutline : lockClosedOutline" />
       </span>
@@ -28,7 +29,7 @@
       </div>
       <div class="metric metric--amber">
         <strong>{{ grupo.ocupadas.length }}</strong>
-        <span>Ocupadas</span>
+        <span>Ocupados</span>
       </div>
       <div class="metric metric--cyan">
         <strong>{{ grupo.enCola }}</strong>
@@ -121,6 +122,13 @@ const puedeEntrarEnCola = computed(
 const puedeSalirDeCola = computed(
   () => props.showStatus && props.grupo.miEnCola,
 )
+
+/* Sin sesión no hay bloque de detalle al que navegar. */
+function onVerDetalle(): void {
+  if (props.showStatus) {
+    emit('verDetalle', props.grupo)
+  }
+}
 </script>
 
 <style scoped>
@@ -175,7 +183,7 @@ const puedeSalirDeCola = computed(
   outline-offset: 3px;
 }
 
-.type-summary__title:hover h3 {
+a.type-summary__title:hover h3 {
   color: var(--app-green);
 }
 

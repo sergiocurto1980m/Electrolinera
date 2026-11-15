@@ -226,7 +226,11 @@
           />
         </section>
 
-        <section class="groups" aria-labelledby="puestos-title">
+        <section
+          v-if="isAuthenticated"
+          class="groups"
+          aria-labelledby="puestos-title"
+        >
           <header class="groups__head">
             <div>
               <h2 id="puestos-title">Puestos por tipo</h2>
@@ -547,11 +551,19 @@ function onSalirDeCola(grupo: HomeGrupoEstacion): void {
   )
 }
 
-/* Desde el resumen de un tipo se salta a su bloque de detalle. */
+/* Desde el resumen de un tipo se abre su bloque de detalle y se salta a él. */
 function irAlDetalle(grupo: HomeGrupoEstacion): void {
-  const destino = document.getElementById(`grupo-${grupo.tipoId}`)
+  const destino = document.getElementById(
+    `grupo-${grupo.tipoId}`,
+  ) as HTMLDetailsElement | null
 
-  destino?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  if (!destino) return
+
+  destino.open = true
+
+  requestAnimationFrame(() => {
+    destino.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
 const subtitle = computed(() => {

@@ -243,10 +243,12 @@ completo con los datos de ejemplo.
 ### Home pública y estado privado
 
 - **Resumen por tipo**: el nombre de cada tarjeta (y su enlace **Ver detalle**)
-  desplaza la vista al bloque de puestos de ese tipo.
+  abre el bloque plegado de ese tipo y desplaza la vista hasta él.
+- **Detalle por tipo**: las tarjetas de puestos están **plegadas por defecto**;
+  se abren al pulsar su cabecera o desde **Ver detalle** en el resumen.
 - **Invitado**:
-  - Ve las estaciones agrupadas por tipo, con el total de puestos.
-  - No ve libres/ocupadas, tiempo, cola ni avisos.
+  - Ve solo el resumen por tipo: nombre y total de puestos.
+  - No ve el detalle de los puestos, ni libres/ocupados, tiempo, cola o avisos.
   - Tiene botón `Entrar` en el header y CTA `Crear cuenta` / `Ya tengo cuenta`.
 - **Usuario autenticado**:
   - Ve el estado diario completo y los avisos en tiempo real.

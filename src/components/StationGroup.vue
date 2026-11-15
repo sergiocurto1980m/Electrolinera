@@ -1,21 +1,31 @@
 <template>
-  <article class="group" :aria-label="`Puestos de ${grupo.tipo}`">
-    <header class="group__head">
-      <div class="group__title">
-        <h3>{{ grupo.tipo }}</h3>
-        <p>{{ pluralizar(grupo.total, 'puesto', 'puestos') }}</p>
-      </div>
+  <details class="group" :aria-label="`Puestos de ${grupo.tipo}`">
+    <summary class="group__summary">
+      <header class="group__head">
+        <div class="group__title">
+          <h3>{{ grupo.tipo }}</h3>
+          <p>{{ pluralizar(grupo.total, 'puesto', 'puestos') }}</p>
+        </div>
 
-      <div v-if="showStatus" class="group__chips">
-        <span class="chip chip--green">
-          {{ pluralizar(grupo.libres.length, 'libre', 'libres') }}
-        </span>
-        <span class="chip chip--amber">
-          {{ pluralizar(grupo.ocupadas.length, 'ocupada', 'ocupadas') }}
-        </span>
-        <span v-if="grupo.completo" class="chip chip--muted">Completo</span>
-      </div>
-    </header>
+        <div v-if="showStatus" class="group__chips">
+          <span class="chip chip--green">
+            {{ pluralizar(grupo.libres.length, 'libre', 'libres') }}
+          </span>
+          <span class="chip chip--amber">
+            {{ pluralizar(grupo.ocupadas.length, 'ocupado', 'ocupados') }}
+          </span>
+          <span class="chip chip--cyan">
+            {{ pluralizar(grupo.enCola, 'en cola', 'en cola') }}
+          </span>
+        </div>
+      </header>
+
+      <ion-icon
+        class="group__chevron"
+        :icon="chevronDownOutline"
+        aria-hidden="true"
+      />
+    </summary>
 
     <div class="group__body" :class="{ 'group__body--queued': showStatus }">
       <section class="group__section" :aria-label="`${grupo.tipo}: tomas`">
@@ -106,11 +116,13 @@
         </div>
       </section>
     </div>
-  </article>
+  </details>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { IonIcon } from '@ionic/vue'
+import { chevronDownOutline } from 'ionicons/icons'
 import StationRow from '@/components/StationRow.vue'
 import { formatHora, pluralizar } from '@/utils/format'
 import type { HomeEstacion, HomeGrupoEstacion } from '@/types/home'
@@ -193,12 +205,50 @@ function puedeEnganchar(estacion: HomeEstacion): boolean {
   box-shadow: var(--app-shadow);
 }
 
+.group__summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px;
+  border-radius: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.group__summary::-webkit-details-marker {
+  display: none;
+}
+
+.group__summary::marker {
+  content: '';
+}
+
+.group__summary:focus-visible {
+  outline: 2px solid var(--app-green);
+  outline-offset: 4px;
+}
+
 .group__head {
+  flex: 1;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  min-width: 0;
+}
+
+.group__chevron {
+  flex: none;
+  font-size: 18px;
+  color: var(--app-muted);
+  transition:
+    transform 180ms ease,
+    color 180ms ease;
+}
+
+.group[open] .group__chevron {
+  transform: rotate(180deg);
+  color: var(--app-green);
 }
 
 .group__title {
@@ -246,10 +296,10 @@ function puedeEnganchar(estacion: HomeEstacion): boolean {
   border: 1px solid rgba(255, 176, 32, 0.24);
 }
 
-.chip--muted {
-  color: var(--app-muted);
-  background: rgba(148, 190, 175, 0.07);
-  border: 1px solid var(--app-border);
+.chip--cyan {
+  color: var(--app-cyan);
+  background: rgba(34, 211, 238, 0.1);
+  border: 1px solid rgba(34, 211, 238, 0.25);
 }
 
 .group__body {
@@ -257,6 +307,7 @@ function puedeEnganchar(estacion: HomeEstacion): boolean {
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 16px;
+  margin-top: 14px;
 }
 
 .group__body--queued {
@@ -433,6 +484,10 @@ function puedeEnganchar(estacion: HomeEstacion): boolean {
 @media (max-width: 820px) {
   .group {
     padding: 14px;
+  }
+
+  .group__summary {
+    align-items: flex-start;
   }
 
   .group__head {
