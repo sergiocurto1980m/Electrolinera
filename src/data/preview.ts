@@ -132,6 +132,15 @@ export const previewCola: HomeColaItem[] = [
 
 export const previewAvisos: HomeAviso[] = [
   {
+    id: 106,
+    aviso: 'En OOAA, Marta R. se ha enganchado al Poste 3 · Toma 1.',
+    fecha_hora: new Date(Date.now() - 60_000).toISOString(),
+    estacion_id: 4,
+    tipo_estacion: 'OOAA',
+    tipo_poste: '3',
+    tipo_toma: '1',
+  },
+  {
     id: 105,
     aviso: 'Hay un puesto libre en OOAA. Puedes engancharte.',
     fecha_hora: new Date(Date.now() - 2 * 60_000).toISOString(),

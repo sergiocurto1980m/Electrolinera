@@ -71,6 +71,7 @@ Ejecuta en **Supabase → SQL Editor**, en este orden:
 4. [`supabase/migrations/0004_gestion_diaria.sql`](supabase/migrations/0004_gestion_diaria.sql)
 5. [`supabase/migrations/0005_admin_config.sql`](supabase/migrations/0005_admin_config.sql)
 6. [`supabase/migrations/0006_home_cola.sql`](supabase/migrations/0006_home_cola.sql)
+7. [`supabase/migrations/0007_aviso_enganche.sql`](supabase/migrations/0007_aviso_enganche.sql)
 
 La primera prepara la Home:
 
@@ -124,6 +125,13 @@ La sexta expone la cola actual de cada tipo de estación:
    del usuario actual.
 3. Solo los usuarios autenticados pueden ejecutarla; un invitado no ve nombres.
 4. La Home muestra la lista de la cola debajo de las tomas de cada tipo.
+
+La séptima avisa a la cola cuando un puesto se ocupa:
+
+1. Al engancharse alguien, se crea un aviso personal para cada usuario que
+   sigue esperando en la cola de ese tipo.
+2. El aviso indica tipo de estación, nombre, poste y toma.
+3. Aparece en el panel **Avisos** y como toast en tiempo real.
 
 > El bloqueo del estado no es solo visual: un invitado tampoco puede leerlo
 > llamando directamente a la API de Supabase.
@@ -342,7 +350,8 @@ supabase/
    ├─ 0003_home_public.sql
    ├─ 0004_gestion_diaria.sql
    ├─ 0005_admin_config.sql
-   └─ 0006_home_cola.sql
+   ├─ 0006_home_cola.sql
+   └─ 0007_aviso_enganche.sql
 ```
 
 ## Modelo de datos
