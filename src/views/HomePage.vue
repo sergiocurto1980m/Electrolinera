@@ -98,32 +98,103 @@
           </div>
         </section>
 
-        <section v-if="isAuthenticated && miEstacion" class="active-session">
-          <span class="active-session__icon" aria-hidden="true">
-            <ion-icon :icon="flashOutline" />
-          </span>
-
-          <div class="active-session__copy">
-            <p class="active-session__eyebrow">Tu puesto</p>
-            <h2>
-              {{ miEstacion.tipo_estacion }} · Poste
-              {{ miEstacion.tipo_poste }} · Toma {{ miEstacion.tipo_toma }}
-            </h2>
-            <p>
-              Mientras estés enganchado solo puedes desengancharte de este
-              puesto.
-            </p>
+        <section
+          v-if="isAuthenticated && !error"
+          class="user-status"
+          aria-live="polite"
+        >
+          <div
+            v-if="loading"
+            class="user-status__item user-status__item--comprobando"
+          >
+            <span class="user-status__icon" aria-hidden="true">
+              <ion-icon :icon="estadoIcons.comprobando" />
+            </span>
+            <div class="user-status__body">
+              <p class="user-status__label">Comprobando estado</p>
+              <p class="user-status__detail">
+                Consultando tu puesto y tus listas de espera…
+              </p>
+            </div>
           </div>
 
-          <button
-            class="active-session__action"
-            type="button"
-            :disabled="accionando"
-            @click="onDesengancharse(miEstacion)"
-          >
-            <unplug-icon />
-            <span>{{ accionando ? 'Desenganchando…' : 'Desengancharse' }}</span>
-          </button>
+          <template v-else>
+            <div
+              v-if="miEstacion"
+              class="user-status__item user-status__item--cargando"
+            >
+              <span class="user-status__icon" aria-hidden="true">
+                <ion-icon :icon="estadoIcons.cargando" />
+              </span>
+
+              <div class="user-status__body">
+                <p class="user-status__label">Estás cargando</p>
+                <p class="user-status__detail">
+                  Estación {{ miEstacion.tipo_estacion }} · Poste
+                  {{ miEstacion.tipo_poste }} · Toma {{ miEstacion.tipo_toma }}
+                </p>
+                <p class="user-status__hint">
+                  Mientras estés enganchado solo puedes desengancharte de este
+                  puesto.
+                </p>
+              </div>
+
+              <button
+                class="user-status__action"
+                type="button"
+                :disabled="accionando"
+                @click="desengancharDesdeIndicador"
+              >
+                <unplug-icon />
+                <span>{{
+                  accionando ? 'Desenganchando…' : 'Desengancharse'
+                }}</span>
+              </button>
+            </div>
+
+            <div
+              v-for="cola in misColas"
+              :key="`cola-${cola.tipoId}`"
+              class="user-status__item user-status__item--cola"
+            >
+              <span class="user-status__icon" aria-hidden="true">
+                <ion-icon :icon="estadoIcons.cola" />
+              </span>
+
+              <div class="user-status__body">
+                <p class="user-status__label">En lista de espera</p>
+                <p class="user-status__detail">{{ cola.detalle }}</p>
+                <p class="user-status__hint">
+                  Te avisaremos cuando se libere un puesto de este tipo.
+                </p>
+              </div>
+
+              <button
+                class="user-status__action"
+                type="button"
+                :disabled="accionando"
+                @click="salirDeColaDesdeIndicador(cola.grupo)"
+              >
+                <span>{{ accionando ? 'Saliendo…' : 'Salir de la cola' }}</span>
+              </button>
+            </div>
+
+            <div
+              v-if="!miEstacion && misColas.length === 0"
+              class="user-status__item user-status__item--libre"
+            >
+              <span class="user-status__icon" aria-hidden="true">
+                <ion-icon :icon="estadoIcons.libre" />
+              </span>
+
+              <div class="user-status__body">
+                <p class="user-status__label">Sin actividad</p>
+                <p class="user-status__detail">
+                  No estás cargando ni en ninguna lista de espera.
+                </p>
+              </div>
+            </div>
+          </template>
         </section>
 
         <section
@@ -148,6 +219,9 @@
             :key="grupo.tipoId"
             :grupo="grupo"
             :show-status="isAuthenticated"
+            :accionando="accionando"
+            @entrar-en-cola="onEntrarEnCola"
+            @salir-de-cola="onSalirDeCola"
           />
         </section>
 
@@ -192,7 +266,6 @@
               :grupo="grupo"
               :show-status="isAuthenticated"
               :mi-estacion-id="miEstacion?.id ?? null"
-              :usuario-en-cola="usuarioEnCola"
               :accionando="accionando"
               @engancharse="onEngancharse"
               @desengancharse="onDesengancharse"
@@ -264,9 +337,11 @@ import {
 } from '@ionic/vue'
 import type { AlertButton } from '@ionic/vue'
 import {
+  checkmarkCircleOutline,
   flashOutline,
   lockClosedOutline,
   refreshOutline,
+  timeOutline,
   warningOutline,
 } from 'ionicons/icons'
 import AvisosPanel from '@/components/AvisosPanel.vue'
@@ -403,17 +478,15 @@ async function runAction(
 }
 
 function onEngancharse(estacion: HomeEstacion): void {
-  const colaActual = miCola.value
-  const otraCola =
-    colaActual !== null && colaActual.tipoId !== estacion.tipo_estacion_id
-      ? colaActual
-      : null
-
-  const avisoCola = otraCola
-    ? ` También saldrás de la cola de ${otraCola.tipo}.`
-    : ''
-  const sufijoExito = otraCola
-    ? ` y has salido de la cola de ${otraCola.tipo}`
+  /*
+   * Al engancharse solo se cierra la cola de ese tipo. Las colas de otros
+   * tipos se mantienen.
+   */
+  const colaDeEsteTipo = misColas.value.find(
+    (cola) => cola.tipoId === estacion.tipo_estacion_id,
+  )
+  const avisoCola = colaDeEsteTipo
+    ? ` Saldrás de la cola de ${colaDeEsteTipo.tipo}.`
     : ''
 
   pendingConfirm.value = {
@@ -423,7 +496,7 @@ function onEngancharse(estacion: HomeEstacion): void {
     run: () => {
       void runAction(
         () => engancharse(estacion.id),
-        `Te has enganchado al Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma}${sufijoExito}.`,
+        `Te has enganchado al Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma}.`,
       )
     },
   }
@@ -553,11 +626,44 @@ const grupos = computed<HomeGrupoEstacion[]>(() => {
   return [...mapa.values()]
 })
 
-const miCola = computed(
-  () => grupos.value.find((grupo) => grupo.miEnCola) ?? null,
+/*
+ * El usuario puede estar cargando y, a la vez, en varias colas (una por tipo).
+ * El indicador pinta una fila por cada situación.
+ */
+const misColas = computed(() =>
+  grupos.value
+    .filter((grupo) => grupo.miEnCola)
+    .map((grupo) => {
+      const posicion =
+        grupo.cola.find((item) => item.es_mio)?.posicion ?? null
+
+      return {
+        tipoId: grupo.tipoId,
+        tipo: grupo.tipo,
+        posicion,
+        grupo,
+        detalle: `Estación ${grupo.tipo}${posicion ? ` · Posición ${posicion}` : ''}`,
+      }
+    }),
 )
 
-const usuarioEnCola = computed(() => miCola.value !== null)
+const estadoIcons = {
+  cargando: flashOutline,
+  cola: timeOutline,
+  libre: checkmarkCircleOutline,
+  comprobando: timeOutline,
+}
+
+function desengancharDesdeIndicador(): void {
+  const estacion = miEstacion.value
+  if (estacion) {
+    onDesengancharse(estacion)
+  }
+}
+
+function salirDeColaDesdeIndicador(grupo: HomeGrupoEstacion): void {
+  onSalirDeCola(grupo)
+}
 </script>
 
 <style scoped>
@@ -870,72 +976,135 @@ const usuarioEnCola = computed(() => miCola.value !== null)
   background: rgba(148, 190, 175, 0.06);
 }
 
-.active-session {
+.user-status {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 18px;
+  flex-direction: column;
   border-radius: var(--app-radius);
-  border: 1px solid rgba(43, 229, 156, 0.35);
+  border: 1px solid var(--app-border);
   background:
     radial-gradient(
       460px 160px at 0% 0%,
-      rgba(43, 229, 156, 0.16),
+      rgba(148, 190, 175, 0.06),
       transparent 70%
     ),
     linear-gradient(135deg, rgba(19, 31, 27, 0.96), rgba(10, 16, 14, 0.9));
-  box-shadow:
-    var(--app-shadow),
-    inset 0 0 0 1px rgba(43, 229, 156, 0.06);
+  box-shadow: var(--app-shadow);
+  overflow: hidden;
 }
 
-.active-session__icon {
+.user-status__item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+}
+
+.user-status__item + .user-status__item {
+  border-top: 1px solid var(--app-border);
+}
+
+.user-status__item--cargando {
+  background: linear-gradient(
+    90deg,
+    rgba(43, 229, 156, 0.09),
+    transparent 65%
+  );
+}
+
+.user-status__item--cola {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 176, 32, 0.08),
+    transparent 65%
+  );
+}
+
+.user-status__item--comprobando {
+  background: linear-gradient(
+    90deg,
+    rgba(34, 211, 238, 0.07),
+    transparent 65%
+  );
+}
+
+.user-status__icon {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   flex: none;
-  border-radius: 13px;
+  border-radius: 12px;
+  border: 1px solid var(--app-border);
+  background: rgba(148, 190, 175, 0.08);
+  color: var(--app-muted);
+}
+
+.user-status__icon ion-icon {
+  font-size: 21px;
+}
+
+.user-status__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-status__label {
+  margin: 0;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
+.user-status__detail {
+  margin: 3px 0 0;
+  font-size: 0.92rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--app-text);
+}
+
+.user-status__hint {
+  margin: 3px 0 0;
+  font-size: 0.76rem;
+  color: var(--app-muted);
+}
+
+.user-status__item--cargando .user-status__icon {
   color: #04120d;
+  border-color: transparent;
   background: linear-gradient(145deg, #3cf0a8, #16b97b);
   box-shadow:
     0 12px 26px -14px rgba(43, 229, 156, 0.9),
     inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
-.active-session__icon ion-icon {
-  font-size: 22px;
-}
-
-.active-session__copy {
-  flex: 1;
-  min-width: 0;
-}
-
-.active-session__eyebrow {
-  margin: 0;
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+.user-status__item--cargando .user-status__label {
   color: var(--app-green);
 }
 
-.active-session__copy h2 {
-  margin: 3px 0 0;
-  font-size: 1rem;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  color: var(--app-text);
+.user-status__item--cola .user-status__icon {
+  color: var(--app-amber);
+  border-color: rgba(255, 176, 32, 0.32);
+  background: rgba(255, 176, 32, 0.1);
 }
 
-.active-session__copy p {
-  margin: 3px 0 0;
-  font-size: 0.78rem;
-  color: var(--app-muted);
+.user-status__item--cola .user-status__label {
+  color: var(--app-amber);
 }
 
-.active-session__action {
+.user-status__item--comprobando .user-status__icon {
+  color: var(--app-cyan);
+  border-color: rgba(34, 211, 238, 0.28);
+  background: rgba(34, 211, 238, 0.08);
+}
+
+.user-status__item--comprobando .user-status__label {
+  color: var(--app-cyan);
+}
+
+.user-status__action {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -950,17 +1119,17 @@ const usuarioEnCola = computed(() => miCola.value !== null)
   cursor: pointer;
 }
 
-.active-session__action:hover:not(:disabled) {
+.user-status__action:hover:not(:disabled) {
   border-color: rgba(255, 176, 32, 0.6);
   background: rgba(255, 176, 32, 0.16);
 }
 
-.active-session__action:disabled {
+.user-status__action:disabled {
   opacity: 0.6;
   cursor: progress;
 }
 
-.active-session__action svg {
+.user-status__action svg {
   width: 17px;
   height: 17px;
 }
@@ -1127,12 +1296,12 @@ const usuarioEnCola = computed(() => miCola.value !== null)
     flex: 1;
   }
 
-  .active-session {
+  .user-status__item {
     flex-wrap: wrap;
-    padding: 14px;
+    padding: 12px 14px;
   }
 
-  .active-session__action {
+  .user-status__action {
     width: 100%;
     justify-content: center;
   }

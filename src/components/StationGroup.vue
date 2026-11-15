@@ -120,13 +120,11 @@ const props = withDefaults(
     grupo: HomeGrupoEstacion
     showStatus?: boolean
     miEstacionId?: number | null
-    usuarioEnCola?: boolean
     accionando?: boolean
   }>(),
   {
     showStatus: true,
     miEstacionId: null,
-    usuarioEnCola: false,
     accionando: false,
   },
 )
@@ -151,13 +149,16 @@ const puestos = computed<HomeEstacion[]>(() =>
   ].sort(porPoste),
 )
 
+/*
+ * Estar cargando en otro tipo no impide apuntarse a esta cola. Solo se oculta
+ * en el tipo en el que el usuario ya ocupa un puesto.
+ */
 const puedeEntrarEnCola = computed(
   () =>
     props.showStatus &&
-    props.miEstacionId === null &&
-    !props.usuarioEnCola &&
     !props.grupo.miEnCola &&
-    props.grupo.completo,
+    props.grupo.completo &&
+    !props.grupo.ocupadas.some((estacion) => estacion.es_mio),
 )
 
 const reservadoPorCola = computed(

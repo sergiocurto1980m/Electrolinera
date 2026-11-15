@@ -42,21 +42,67 @@
         :style="{ flexGrow: grupo.ocupadas.length }"
       />
     </div>
+
+    <button
+      v-if="puedeEntrarEnCola"
+      class="type-summary__queue"
+      type="button"
+      :disabled="accionando"
+      @click="emit('entrarEnCola', grupo)"
+    >
+      <ion-icon :icon="timeOutline" aria-hidden="true" />
+      <span>{{ accionando ? 'Entrando…' : 'Ponerse en la cola' }}</span>
+    </button>
+
+    <button
+      v-else-if="puedeSalirDeCola"
+      class="type-summary__queue type-summary__queue--leave"
+      type="button"
+      :disabled="accionando"
+      @click="emit('salirDeCola', grupo)"
+    >
+      <ion-icon :icon="timeOutline" aria-hidden="true" />
+      <span>{{ accionando ? 'Saliendo…' : 'Salir de la cola' }}</span>
+    </button>
   </article>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { IonIcon } from '@ionic/vue'
-import { flashOutline, lockClosedOutline } from 'ionicons/icons'
+import { flashOutline, lockClosedOutline, timeOutline } from 'ionicons/icons'
 import { pluralizar } from '@/utils/format'
 import type { HomeGrupoEstacion } from '@/types/home'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     grupo: HomeGrupoEstacion
     showStatus?: boolean
+    accionando?: boolean
   }>(),
-  { showStatus: true },
+  { showStatus: true, accionando: false },
+)
+
+const emit = defineEmits<{
+  entrarEnCola: [grupo: HomeGrupoEstacion]
+  salirDeCola: [grupo: HomeGrupoEstacion]
+}>()
+
+/*
+ * Se puede entrar en la cola cuando el tipo está completo y no se ocupa uno
+ * de sus puestos. Si ya se está apuntado, el mismo botón permite salir y
+ * volver a entrar más tarde el mismo día.
+ */
+const puedeEntrarEnCola = computed(
+  () =>
+    props.showStatus &&
+    props.grupo.completo &&
+    !props.grupo.miEnCola &&
+    !props.grupo.ocupadas.some((estacion) => estacion.es_mio),
+)
+
+const puedeSalirDeCola = computed(
+  () => props.showStatus && props.grupo.miEnCola,
 )
 </script>
 
@@ -224,5 +270,51 @@ withDefaults(
 
 .bar--muted {
   background: var(--app-dim);
+}
+
+.type-summary__queue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  margin-top: -2px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(43, 229, 156, 0.3);
+  background: rgba(43, 229, 156, 0.08);
+  color: var(--app-green);
+  font-size: 0.76rem;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.type-summary__queue ion-icon {
+  font-size: 16px;
+}
+
+.type-summary__queue:hover:not(:disabled) {
+  border-color: rgba(43, 229, 156, 0.5);
+  background: rgba(43, 229, 156, 0.14);
+}
+
+.type-summary__queue--leave {
+  color: var(--app-amber);
+  border-color: rgba(255, 176, 32, 0.3);
+  background: rgba(255, 176, 32, 0.09);
+}
+
+.type-summary__queue--leave:hover:not(:disabled) {
+  border-color: rgba(255, 176, 32, 0.5);
+  background: rgba(255, 176, 32, 0.16);
+}
+
+.type-summary__queue:disabled {
+  opacity: 0.55;
+  cursor: progress;
 }
 </style>

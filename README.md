@@ -72,6 +72,7 @@ Ejecuta en **Supabase → SQL Editor**, en este orden:
 5. [`supabase/migrations/0005_admin_config.sql`](supabase/migrations/0005_admin_config.sql)
 6. [`supabase/migrations/0006_home_cola.sql`](supabase/migrations/0006_home_cola.sql)
 7. [`supabase/migrations/0007_aviso_enganche.sql`](supabase/migrations/0007_aviso_enganche.sql)
+8. [`supabase/migrations/0008_cola_multiple.sql`](supabase/migrations/0008_cola_multiple.sql)
 
 La primera prepara la Home:
 
@@ -132,6 +133,15 @@ La séptima avisa a la cola cuando un puesto se ocupa:
    sigue esperando en la cola de ese tipo.
 2. El aviso indica tipo de estación, nombre, poste y toma.
 3. Aparece en el panel **Avisos** y como toast en tiempo real.
+
+La octava permite combinar carga y colas:
+
+1. Un usuario puede estar cargando y apuntado a una o varias colas, con el
+   límite de **una cola por tipo de estación y día**.
+2. Al engancharse a un puesto solo se cierra la cola de ese tipo; las demás
+   siguen activas.
+3. No se permite apuntarse a la cola del tipo en el que ya se está cargando.
+4. La cola sigue exigiendo que todos los postes del tipo estén ocupados.
 
 > El bloqueo del estado no es solo visual: un invitado tampoco puede leerlo
 > llamando directamente a la API de Supabase.
@@ -238,6 +248,10 @@ completo con los datos de ejemplo.
   - Tiene botón `Entrar` en el header y CTA `Crear cuenta` / `Ya tengo cuenta`.
 - **Usuario autenticado**:
   - Ve el estado diario completo y los avisos en tiempo real.
+  - Tiene un indicador de su situación: **Estás cargando** (estación, poste y
+    toma), una fila **En lista de espera** por cada cola (estación y posición),
+    o **Sin actividad**. Carga y colas pueden mostrarse a la vez. Solo aparece
+    con sesión iniciada y se actualiza con Realtime.
   - Puede engancharse a un poste libre y desengancharse del suyo.
   - Puede apuntarse a la cola de un tipo cuando todos sus postes están ocupados.
   - Dispone del menú lateral y del acceso a `Mi cuenta` desde el header.
@@ -249,6 +263,17 @@ completo con los datos de ejemplo.
     engancharse el mismo día.
 - **Cola**:
   - Solo se permite cuando el tipo está completo.
+  - Un usuario puede estar en varias colas a la vez (una por tipo), incluso
+    mientras está cargando en otro tipo.
+  - El resumen de cada tipo muestra **Ponerse en la cola** cuando todos sus
+    puestos están ocupados y el usuario aún no está apuntado, y **Salir de la
+    cola** cuando ya está dentro.
+  - Se puede entrar, salir y volver a entrar en la misma cola varias veces el
+    mismo día: cada entrada crea una posición nueva. Solo se sale al pulsar
+    **Salir de la cola** o al engancharse a un puesto; recibir un aviso no
+    saca de la cola.
+  - Al engancharse a un puesto solo se cierra la cola de ese tipo; las colas
+    de otros tipos se mantienen.
   - Con una cola activa, solo los usuarios apuntados a esa cola pueden
     engancharse a un poste libre del tipo.
   - Al liberarse un poste se avisa a los tres primeros de la cola.
@@ -351,7 +376,8 @@ supabase/
    ├─ 0004_gestion_diaria.sql
    ├─ 0005_admin_config.sql
    ├─ 0006_home_cola.sql
-   └─ 0007_aviso_enganche.sql
+   ├─ 0007_aviso_enganche.sql
+   └─ 0008_cola_multiple.sql
 ```
 
 ## Modelo de datos
@@ -371,7 +397,9 @@ tipo_toma ─────┘                          (histórico)
   `Ocupado`), el usuario que realizó el cambio, el día y si la ocupación está
   activa.
 - `lista_espera_estacion` guarda la cola por tipo y día. Las entradas de cola
-  no llevan una estación concreta; se activan cuando el tipo está completo.
+  no llevan una estación concreta; se activan cuando el tipo está completo. Un
+  usuario puede tener una entrada activa por tipo y día, además de estar
+  cargando.
 - `avisos` cuelga de una entrada de la cola y lleva `usuario_id` para que cada
   persona reciba solo sus notificaciones.
 - `usuarios` es el perfil público de cada usuario de `auth.users` (`id`, `nombre`,
