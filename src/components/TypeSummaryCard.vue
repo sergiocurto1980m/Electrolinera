@@ -19,6 +19,10 @@
         <strong>{{ grupo.ocupadas.length }}</strong>
         <span>Ocupadas</span>
       </div>
+      <div class="metric metric--cyan">
+        <strong>{{ grupo.enCola }}</strong>
+        <span>En cola</span>
+      </div>
     </div>
 
     <div v-else class="type-summary__locked">
@@ -131,7 +135,7 @@ withDefaults(
 
 .type-summary__metrics {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -184,6 +188,10 @@ withDefaults(
 
 .metric--amber strong {
   color: var(--app-amber);
+}
+
+.metric--cyan strong {
+  color: var(--app-cyan);
 }
 
 .metric--muted strong {

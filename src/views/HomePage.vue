@@ -395,14 +395,27 @@ async function runAction(
 }
 
 function onEngancharse(estacion: HomeEstacion): void {
+  const colaActual = miCola.value
+  const otraCola =
+    colaActual !== null && colaActual.tipoId !== estacion.tipo_estacion_id
+      ? colaActual
+      : null
+
+  const avisoCola = otraCola
+    ? ` También saldrás de la cola de ${otraCola.tipo}.`
+    : ''
+  const sufijoExito = otraCola
+    ? ` y has salido de la cola de ${otraCola.tipo}`
+    : ''
+
   pendingConfirm.value = {
     header: 'Engancharse al puesto',
-    message: `Estación ${estacion.tipo_estacion}: vas a engancharte al Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma}. ¿Quieres continuar?`,
+    message: `Estación ${estacion.tipo_estacion}: vas a engancharte al Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma}.${avisoCola} ¿Quieres continuar?`,
     confirmText: 'Engancharme',
     run: () => {
       void runAction(
         () => engancharse(estacion.id),
-        `Te has enganchado al Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma}.`,
+        `Te has enganchado al Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma}${sufijoExito}.`,
       )
     },
   }
@@ -532,9 +545,11 @@ const grupos = computed<HomeGrupoEstacion[]>(() => {
   return [...mapa.values()]
 })
 
-const usuarioEnCola = computed(() =>
-  grupos.value.some((grupo) => grupo.miEnCola),
+const miCola = computed(
+  () => grupos.value.find((grupo) => grupo.miEnCola) ?? null,
 )
+
+const usuarioEnCola = computed(() => miCola.value !== null)
 </script>
 
 <style scoped>
