@@ -319,10 +319,46 @@ completo con los datos de ejemplo.
 | --- | --- |
 | `npm run dev` | Servidor de desarrollo en el puerto 8100 |
 | `npm run build` | Typecheck + build de producción en `dist/` |
+| `npm run build:pages` | Build + descarga del último APK a `dist/downloads/` |
 | `npm run preview` | Sirve el build de producción |
 | `npm run typecheck` | Solo comprobación de tipos con `vue-tsc` |
 | `npm run cap:sync` | Build + copia los assets a Android |
 | `npm run android` | Abre el proyecto Android en Android Studio |
+
+## Distribución del APK
+
+Cada push a `main` ejecuta `.github/workflows/android-apk.yml`:
+
+1. Compila la web y sincroniza Capacitor.
+2. Firma un APK de release con el keystore de los secretos.
+3. Publica `electrolinera.apk` y `latest.json` en la release rodante
+   `apk-latest` de GitHub.
+4. Llama al deploy hook de Cloudflare Pages.
+
+Cloudflare Pages usa `npm run build:pages`: además de compilar la web, descarga
+el último APK y lo deja en `dist/downloads/`. Queda disponible en:
+
+- `/downloads/electrolinera.apk`
+- `/descargar` (versión y botón de descarga)
+- enlace “Descargar app Android” en el pie de la Home y en el menú lateral.
+
+### Secretos del repositorio (GitHub)
+- `ANDROID_KEYSTORE_BASE64`: keystore en base64.
+- `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
+- `CLOUDFLARE_DEPLOY_HOOK_URL`: deploy hook del proyecto de Pages.
+
+Variables (no secretas): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` y
+`VITE_APP_URL`.
+
+### Cloudflare Pages
+- Build command: `npm run build:pages`.
+- El hook se encarga de reconstruir el sitio cuando el APK ya está publicado,
+  evitando que la web sirva la versión anterior.
+
+La versión del APK es la de `package.json` más el número de ejecución
+(`0.1.0+123`), y `versionCode` es ese mismo número: siempre crece para que
+Android acepte la actualización. El keystore debe conservarse: sin él no se
+pueden publicar actualizaciones sobre instalaciones existentes.
 
 ## Estructura
 
@@ -363,10 +399,15 @@ src/
 │  └─ url.ts
 └─ views/
    ├─ AccountPage.vue      # Mi cuenta
+   ├─ DownloadPage.vue     # Descarga del APK (/descargar)
    ├─ HomePage.vue
    ├─ LoginPage.vue
    ├─ RegisterPage.vue
    └─ SettingsPage.vue     # Configuración (solo admin)
+scripts/
+└─ fetch-apk.mjs           # Copia el último APK a dist/downloads en Pages
+.github/workflows/
+└─ android-apk.yml         # Build del APK firmado + release
 supabase/
 ├─ functions/
 │  └─ auth-settings/

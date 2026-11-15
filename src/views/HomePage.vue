@@ -285,6 +285,13 @@
 
         <footer class="home-footer">
           <span>Electrolinera · v0.1.0</span>
+          <router-link
+            v-if="!isNativeApp"
+            class="home-footer__download"
+            :to="{ name: 'descargar' }"
+          >
+            Descargar app Android
+          </router-link>
           <span v-if="lastSync">Sync {{ formatHora(lastSync) }}</span>
         </footer>
       </main>
@@ -1261,10 +1268,21 @@ function salirDeColaDesdeIndicador(grupo: HomeGrupoEstacion): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   padding: 2px 2px 0;
   font-size: 0.7rem;
   color: var(--app-dim);
+}
+
+.home-footer__download {
+  color: var(--app-green);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.home-footer__download:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 820px) {

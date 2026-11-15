@@ -111,6 +111,19 @@
             aria-hidden="true"
           />
         </ion-item>
+
+        <ion-item
+          v-if="!esNativo"
+          router-link="/descargar"
+          router-direction="forward"
+          :detail="false"
+          lines="none"
+          class="menu-link"
+          @click="closeMenu"
+        >
+          <ion-icon slot="start" :icon="downloadOutline" aria-hidden="true" />
+          <ion-label>Descargar Android</ion-label>
+        </ion-item>
       </nav>
     </ion-content>
 
@@ -141,6 +154,7 @@ import {
   menuController,
 } from '@ionic/vue'
 import {
+  downloadOutline,
   flash,
   flashOutline,
   homeOutline,
@@ -151,11 +165,14 @@ import {
   personCircleOutline,
   settingsOutline,
 } from 'ionicons/icons'
+import { Capacitor } from '@capacitor/core'
 import { useAuth } from '@/composables/useAuth'
 
 const route = useRoute()
 const router = useRouter()
 const { perfil, initials, signOut } = useAuth()
+
+const esNativo = Capacitor.isNativePlatform()
 
 const isHome = computed(() => route.path === '/home')
 const isAccount = computed(() => route.path === '/cuenta')

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from '@ionic/vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import AccountPage from '@/views/AccountPage.vue'
+import DownloadPage from '@/views/DownloadPage.vue'
 import HomePage from '@/views/HomePage.vue'
 import LoginPage from '@/views/LoginPage.vue'
 import RegisterPage from '@/views/RegisterPage.vue'
@@ -28,6 +29,12 @@ const routes: RouteRecordRaw[] = [
     path: '/home',
     name: 'home',
     component: HomePage,
+    meta: { public: true },
+  },
+  {
+    path: '/descargar',
+    name: 'descargar',
+    component: DownloadPage,
     meta: { public: true },
   },
   {

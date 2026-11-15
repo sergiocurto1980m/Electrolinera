@@ -29,4 +29,7 @@ android/capacitor-cordova-android-plugins/build/
 coverage/
 *.tsbuildinfo
 
+# Artefactos del workflow de Android
+/release/
+
 supabase/.temp/
