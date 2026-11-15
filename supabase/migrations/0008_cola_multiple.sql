@@ -16,7 +16,7 @@
 drop index if exists public.uq_lista_usuario_en_lista_dia;
 
 do $$
-declare
+declare 
   v_en_lista integer;
 begin
   select id into v_en_lista
