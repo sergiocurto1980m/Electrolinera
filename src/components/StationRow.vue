@@ -15,6 +15,10 @@
       </p>
 
       <p v-if="showStatus" class="station-row__meta">
+        <span class="status-pill" :class="`status-pill--${estadoClase}`">
+          {{ estadoTexto }}
+        </span>
+
         <span class="meta-item">
           <ion-icon :icon="timeOutline" aria-hidden="true" />
           {{ desde }}
@@ -94,6 +98,14 @@ const tone = computed(() => {
 })
 
 const estadoLabel = computed(() => props.estacion.estado ?? 'sin estado')
+
+const estadoTexto = computed(() => props.estacion.estado ?? 'Sin estado')
+
+const estadoClase = computed(() => {
+  if (props.estacion.estado === 'Libre') return 'libre'
+  if (props.estacion.estado === 'Ocupado') return 'ocupado'
+  return 'sin-estado'
+})
 
 const desde = computed(() =>
   props.estacion.estado_desde
@@ -197,10 +209,42 @@ const ariaLabel = computed(() => {
 .station-row__meta {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 2px 9px;
   margin: 0;
   font-size: 0.68rem;
   color: var(--app-muted);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--app-border);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.status-pill--libre {
+  color: var(--app-green);
+  border-color: rgba(43, 229, 156, 0.28);
+  background: rgba(43, 229, 156, 0.1);
+}
+
+.status-pill--ocupado {
+  color: var(--app-amber);
+  border-color: rgba(255, 176, 32, 0.28);
+  background: rgba(255, 176, 32, 0.1);
+}
+
+.status-pill--sin-estado,
+.status-pill--public {
+  color: var(--app-muted);
+  background: rgba(148, 190, 175, 0.07);
 }
 
 .meta-item {

@@ -24,9 +24,18 @@ export interface HomeAviso {
   tipo_toma: string | null
 }
 
+export interface HomeColaItem {
+  tipo_estacion_id: number
+  posicion: number
+  nombre: string
+  es_mio: boolean
+  fecha_hora: string
+}
+
 export interface HomeSnapshot {
   estaciones: HomeEstacion[]
   avisos: HomeAviso[]
+  cola: HomeColaItem[]
 }
 
 export interface HomeGrupoEstacion {
@@ -36,6 +45,7 @@ export interface HomeGrupoEstacion {
   libres: HomeEstacion[]
   ocupadas: HomeEstacion[]
   sinEstado: HomeEstacion[]
+  cola: HomeColaItem[]
   enCola: number
   miEnCola: boolean
   completo: boolean

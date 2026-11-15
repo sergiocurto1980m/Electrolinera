@@ -1,4 +1,4 @@
-import type { HomeAviso, HomeEstacion } from '@/types/home'
+import type { HomeAviso, HomeColaItem, HomeEstacion } from '@/types/home'
 
 /**
  * Datos de vista previa local.
@@ -110,6 +110,23 @@ export const previewEstaciones: HomeEstacion[] = [
     cargando: 1,
     es_mio: false,
     mi_en_cola: false,
+  },
+]
+
+export const previewCola: HomeColaItem[] = [
+  {
+    tipo_estacion_id: 2,
+    posicion: 1,
+    nombre: 'Marta R.',
+    es_mio: false,
+    fecha_hora: new Date(Date.now() - 34 * 60_000).toISOString(),
+  },
+  {
+    tipo_estacion_id: 2,
+    posicion: 2,
+    nombre: 'Javier L.',
+    es_mio: false,
+    fecha_hora: new Date(Date.now() - 12 * 60_000).toISOString(),
   },
 ]
 

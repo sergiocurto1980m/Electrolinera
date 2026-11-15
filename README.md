@@ -70,6 +70,7 @@ Ejecuta en **Supabase → SQL Editor**, en este orden:
 3. [`supabase/migrations/0003_home_public.sql`](supabase/migrations/0003_home_public.sql)
 4. [`supabase/migrations/0004_gestion_diaria.sql`](supabase/migrations/0004_gestion_diaria.sql)
 5. [`supabase/migrations/0005_admin_config.sql`](supabase/migrations/0005_admin_config.sql)
+6. [`supabase/migrations/0006_home_cola.sql`](supabase/migrations/0006_home_cola.sql)
 
 La primera prepara la Home:
 
@@ -115,6 +116,14 @@ La quinta añade la administración de Auth:
 2. Marca como administrador a `smcurto@mitma.es`.
 3. Permite leer el rol solo al propio usuario.
 4. La app muestra **Configuración** únicamente a administradores.
+
+La sexta expone la cola actual de cada tipo de estación:
+
+1. Crea la función `cola_actual()`, de solo lectura.
+2. Devuelve posición, nombre del usuario, hora de entrada y si la entrada es
+   del usuario actual.
+3. Solo los usuarios autenticados pueden ejecutarla; un invitado no ve nombres.
+4. La Home muestra la lista de la cola debajo de las tomas de cada tipo.
 
 > El bloqueo del estado no es solo visual: un invitado tampoco puede leerlo
 > llamando directamente a la API de Supabase.
@@ -332,7 +341,8 @@ supabase/
    ├─ 0002_users.sql
    ├─ 0003_home_public.sql
    ├─ 0004_gestion_diaria.sql
-   └─ 0005_admin_config.sql
+   ├─ 0005_admin_config.sql
+   └─ 0006_home_cola.sql
 ```
 
 ## Modelo de datos

@@ -1,5 +1,10 @@
 import { supabase } from './supabase'
-import type { HomeAviso, HomeEstacion, HomeSnapshot } from '@/types/home'
+import type {
+  HomeAviso,
+  HomeColaItem,
+  HomeEstacion,
+  HomeSnapshot,
+} from '@/types/home'
 
 const AVISOS_LIMIT = 10
 
@@ -14,6 +19,8 @@ export function isMissingSchemaError(message: string): boolean {
     message.includes('v_home_estaciones') ||
     message.includes('v_home_estaciones_publica') ||
     message.includes('v_home_avisos') ||
+    message.includes('cola_actual') ||
+    message.includes('PGRST202') ||
     message.includes('PGRST205') ||
     message.includes('does not exist')
   )
@@ -104,13 +111,32 @@ export async function fetchAvisos(
   return (data ?? []) as HomeAviso[]
 }
 
+export async function fetchCola(includeStatus = true): Promise<HomeColaItem[]> {
+  if (!includeStatus) {
+    return []
+  }
+
+  if (!supabase) {
+    throw new Error('Supabase no está configurado')
+  }
+
+  const { data, error } = await supabase.rpc('cola_actual')
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as unknown as HomeColaItem[]
+}
+
 export async function fetchHomeSnapshot(
   includeStatus: boolean,
 ): Promise<HomeSnapshot> {
-  const [estaciones, avisos] = await Promise.all([
+  const [estaciones, avisos, cola] = await Promise.all([
     fetchEstaciones(includeStatus),
     fetchAvisos(includeStatus),
+    fetchCola(includeStatus),
   ])
 
-  return { estaciones, avisos }
+  return { estaciones, avisos, cola }
 }

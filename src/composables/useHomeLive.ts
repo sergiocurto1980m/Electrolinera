@@ -4,10 +4,11 @@ import { Capacitor } from '@capacitor/core'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { fetchHomeSnapshot, isMissingSchemaError } from '@/services/home.service'
 import { isSupabaseConfigured, supabase } from '@/services/supabase'
-import { previewAvisos, previewEstaciones } from '@/data/preview'
+import { previewAvisos, previewCola, previewEstaciones } from '@/data/preview'
 import { useAuth } from '@/composables/useAuth'
 import type {
   HomeAviso,
+  HomeColaItem,
   HomeEstacion,
   HomeKpis,
   HomeToast,
@@ -34,6 +35,7 @@ export function useHomeLive() {
 
   const estaciones = ref<HomeEstacion[]>([])
   const avisos = ref<HomeAviso[]>([])
+  const cola = ref<HomeColaItem[]>([])
   const loading = ref(true)
   const refreshing = ref(false)
   const error = ref<string | null>(null)
@@ -46,19 +48,12 @@ export function useHomeLive() {
     const libres = estaciones.value.filter((item) => item.estado === 'Libre').length
     const ocupadas = estaciones.value.filter((item) => item.estado === 'Ocupado').length
 
-    const colaPorTipo = new Map<number, number>()
-    for (const item of estaciones.value) {
-      if (item.en_cola_tipo > 0) {
-        colaPorTipo.set(item.tipo_estacion_id, item.en_cola_tipo)
-      }
-    }
-
     return {
       total,
       libres,
       ocupadas,
       sinEstado: estaciones.value.filter((item) => !item.estado).length,
-      enCola: [...colaPorTipo.values()].reduce((sum, value) => sum + value, 0),
+      enCola: cola.value.length,
       cargando: estaciones.value.reduce((sum, item) => sum + (item.cargando ?? 0), 0),
     }
   })
@@ -134,6 +129,7 @@ export function useHomeLive() {
 
       estaciones.value = snapshot.estaciones
       avisos.value = snapshot.avisos
+      cola.value = snapshot.cola
       lastSync.value = new Date()
       error.value = null
     } catch (cause) {
@@ -141,7 +137,7 @@ export function useHomeLive() {
 
       const message = getErrorMessage(cause)
       error.value = isMissingSchemaError(message)
-        ? 'Falta crear o actualizar las vistas de la Home. Ejecuta las migraciones 0001_home.sql, 0003_home_public.sql y 0004_gestion_diaria.sql en el SQL Editor de Supabase.'
+        ? 'Falta crear o actualizar las vistas de la Home. Ejecuta las migraciones 0001_home.sql, 0003_home_public.sql, 0004_gestion_diaria.sql y 0006_home_cola.sql en el SQL Editor de Supabase.'
         : message
     } finally {
       if (version === loadVersion) {
@@ -270,6 +266,7 @@ export function useHomeLive() {
     if (isPreview) {
       estaciones.value = previewEstaciones
       avisos.value = previewAvisos
+      cola.value = previewCola
       lastSync.value = new Date()
       loading.value = false
       return
@@ -324,6 +321,7 @@ export function useHomeLive() {
   watch(isAuthenticated, async (authenticated) => {
     if (!authenticated) {
       avisos.value = []
+      cola.value = []
       toast.value = null
     }
 
@@ -337,6 +335,7 @@ export function useHomeLive() {
   return {
     estaciones,
     avisos,
+    cola,
     loading,
     refreshing,
     error,

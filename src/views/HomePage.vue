@@ -232,6 +232,14 @@
         :color="actionToast?.color ?? 'success'"
         @did-dismiss="actionToast = null"
       />
+
+      <ion-alert
+        :is-open="pendingConfirm !== null"
+        :header="pendingConfirm?.header ?? ''"
+        :message="pendingConfirm?.message ?? ''"
+        :buttons="confirmButtons"
+        @did-dismiss="pendingConfirm = null"
+      />
     </ion-content>
   </ion-page>
 </template>
@@ -239,6 +247,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import {
+  IonAlert,
   IonButtons,
   IonContent,
   IonHeader,
@@ -251,6 +260,7 @@ import {
   IonToast,
   IonToolbar,
 } from '@ionic/vue'
+import type { AlertButton } from '@ionic/vue'
 import {
   flashOutline,
   lockClosedOutline,
@@ -273,6 +283,7 @@ import {
 } from '@/services/estacion.service'
 import { formatHora } from '@/utils/format'
 import type {
+  HomeColaItem,
   HomeEstacion,
   HomeGrupoEstacion,
   LiveStatus,
@@ -281,6 +292,7 @@ import type {
 const {
   estaciones,
   avisos,
+  cola,
   loading,
   refreshing,
   error,
@@ -300,6 +312,32 @@ const actionToast = ref<{
   message: string
   color: 'success' | 'danger'
 } | null>(null)
+
+interface ConfirmAction {
+  header: string
+  message: string
+  confirmText: string
+  destructive?: boolean
+  run: () => void
+}
+
+const pendingConfirm = ref<ConfirmAction | null>(null)
+
+const confirmButtons = computed<AlertButton[]>(() => {
+  const action = pendingConfirm.value
+
+  return [
+    { text: 'Cancelar', role: 'cancel' },
+    {
+      text: action?.confirmText ?? 'Confirmar',
+      ...(action?.destructive ? { role: 'destructive' } : {}),
+      handler: () => {
+        pendingConfirm.value = null
+        action?.run()
+      },
+    },
+  ]
+})
 
 const miEstacion = computed(
   () => estaciones.value.find((estacion) => estacion.es_mio) ?? null,
@@ -357,24 +395,46 @@ async function runAction(
 }
 
 function onEngancharse(estacion: HomeEstacion): void {
-  void runAction(
-    () => engancharse(estacion.id),
-    `Te has enganchado al Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma}.`,
-  )
+  pendingConfirm.value = {
+    header: 'Engancharse al puesto',
+    message: `Estación ${estacion.tipo_estacion}: vas a engancharte al Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma}. ¿Quieres continuar?`,
+    confirmText: 'Engancharme',
+    run: () => {
+      void runAction(
+        () => engancharse(estacion.id),
+        `Te has enganchado al Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma}.`,
+      )
+    },
+  }
 }
 
 function onDesengancharse(estacion: HomeEstacion): void {
-  void runAction(
-    () => desengancharse(estacion.id),
-    'Te has desenganchado. El puesto queda libre.',
-  )
+  pendingConfirm.value = {
+    header: 'Desengancharse del puesto',
+    message: `Estación ${estacion.tipo_estacion}: vas a desengancharte del Poste ${estacion.tipo_poste} · Toma ${estacion.tipo_toma}. El puesto quedará libre y perderás tu sitio. ¿Quieres continuar?`,
+    confirmText: 'Desengancharme',
+    destructive: true,
+    run: () => {
+      void runAction(
+        () => desengancharse(estacion.id),
+        'Te has desenganchado. El puesto queda libre.',
+      )
+    },
+  }
 }
 
 function onEntrarEnCola(grupo: HomeGrupoEstacion): void {
-  void runAction(
-    () => entrarEnCola(grupo.tipoId),
-    `Estás en la cola de ${grupo.tipo}.`,
-  )
+  pendingConfirm.value = {
+    header: 'Ponerse en la cola',
+    message: `Estación ${grupo.tipo}: no quedan puestos libres. Entrarás en la cola de espera para el próximo puesto que se libere. ¿Quieres continuar?`,
+    confirmText: 'Ponerme en cola',
+    run: () => {
+      void runAction(
+        () => entrarEnCola(grupo.tipoId),
+        `Estás en la cola de ${grupo.tipo}.`,
+      )
+    },
+  }
 }
 
 function onSalirDeCola(grupo: HomeGrupoEstacion): void {
@@ -406,6 +466,16 @@ const connectionStatus = computed<LiveStatus>(() =>
 
 const grupos = computed<HomeGrupoEstacion[]>(() => {
   const mapa = new Map<number, HomeGrupoEstacion>()
+  const colaPorTipo = new Map<number, HomeColaItem[]>()
+
+  for (const item of cola.value) {
+    const items = colaPorTipo.get(item.tipo_estacion_id)
+    if (items) {
+      items.push(item)
+    } else {
+      colaPorTipo.set(item.tipo_estacion_id, [item])
+    }
+  }
 
   for (const estacion of estaciones.value) {
     let grupo = mapa.get(estacion.tipo_estacion_id)
@@ -418,6 +488,7 @@ const grupos = computed<HomeGrupoEstacion[]>(() => {
         libres: [],
         ocupadas: [],
         sinEstado: [],
+        cola: [],
         enCola: estacion.en_cola_tipo,
         miEnCola: estacion.mi_en_cola,
         completo: false,
@@ -448,6 +519,14 @@ const grupos = computed<HomeGrupoEstacion[]>(() => {
     grupo.ocupadas.sort(porPoste)
     grupo.sinEstado.sort(porPoste)
     grupo.completo = grupo.ocupadas.length === grupo.total
+
+    const colaTipo = colaPorTipo.get(grupo.tipoId)
+    if (colaTipo) {
+      grupo.cola = colaTipo.sort((a, b) => a.posicion - b.posicion)
+      grupo.enCola = grupo.cola.length
+      grupo.miEnCola =
+        grupo.miEnCola || grupo.cola.some((item) => item.es_mio)
+    }
   }
 
   return [...mapa.values()]
