@@ -37,6 +37,7 @@
           </div>
 
           <button
+            v-if="!isNativeApp"
             class="refresh-btn"
             type="button"
             :disabled="refreshing"
@@ -246,6 +247,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { Capacitor } from '@capacitor/core'
 import {
   IonAlert,
   IonButtons,
@@ -305,6 +307,12 @@ const {
 } = useHomeLive()
 
 const { isAuthenticated } = useAuth()
+
+/*
+ * En la app nativa el refresco manual se hace con el gesto de pull-to-refresh;
+ * el botón solo tiene sentido en la web.
+ */
+const isNativeApp = Capacitor.isNativePlatform()
 
 const accionando = ref(false)
 const actionToast = ref<{

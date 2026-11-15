@@ -17,6 +17,13 @@ import type {
 
 const COALESCE_MS = 400
 
+/*
+ * Esperas para reintentar el canal Realtime cuando se cae. La última se repite
+ * hasta que la conexión vuelva, para no dejar la Home congelada ni saturar
+ * Supabase con reconexiones en bucle.
+ */
+const RECONNECT_DELAYS = [2_000, 5_000, 15_000, 30_000, 60_000]
+
 /**
  * Estado de la Home + suscripción Realtime.
  *
@@ -64,6 +71,10 @@ export function useHomeLive() {
 
   let channel: RealtimeChannel | null = null
   let channelSeq = 0
+  let activeSeq = 0
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let reconnectAttempt = 0
+  let resyncOnSubscribe = false
   let refreshTimer: ReturnType<typeof setTimeout> | null = null
   let dayTimer: ReturnType<typeof setInterval> | null = null
   let loadVersion = 0
@@ -160,13 +171,49 @@ export function useHomeLive() {
     }, COALESCE_MS)
   }
 
+  function clearReconnect(): void {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
+  }
+
+  function detachChannel(): void {
+    const current = channel
+    channel = null
+    activeSeq = 0
+
+    if (current) {
+      void supabase?.removeChannel(current)
+    }
+  }
+
+  function scheduleReconnect(): void {
+    if (isPreview || !mounted || paused || !supabase || reconnectTimer) return
+
+    const delay =
+      RECONNECT_DELAYS[Math.min(reconnectAttempt, RECONNECT_DELAYS.length - 1)]
+    reconnectAttempt += 1
+
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null
+
+      if (isPreview || !mounted || paused || !supabase) return
+      subscribe()
+    }, delay)
+  }
+
   function subscribe(): void {
     if (!supabase || isPreview || channel) return
 
+    clearReconnect()
     status.value = 'connecting'
 
+    const seq = ++channelSeq
+    activeSeq = seq
+
     let next = supabase
-      .channel(`home-live-${++channelSeq}`)
+      .channel(`home-live-${seq}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'estaciones' },
@@ -205,26 +252,50 @@ export function useHomeLive() {
     }
 
     channel = next.subscribe((state) => {
+      // Ignora callbacks de un canal ya cerrado o reemplazado.
+      if (seq !== activeSeq) return
+
       if (state === 'SUBSCRIBED') {
         status.value = 'live'
-      } else if (state === 'CHANNEL_ERROR' || state === 'TIMED_OUT') {
+        clearReconnect()
+        reconnectAttempt = 0
+
+        /*
+         * Realtime no reenvía los eventos perdidos mientras el canal estuvo
+         * caído: al recuperarlo hay que releer el snapshot para no quedarse
+         * con datos viejos.
+         */
+        if (resyncOnSubscribe) {
+          resyncOnSubscribe = false
+          void load(true)
+        }
+      } else if (
+        state === 'CHANNEL_ERROR' ||
+        state === 'TIMED_OUT' ||
+        state === 'CLOSED'
+      ) {
+        if (paused) {
+          status.value = 'paused'
+          return
+        }
+
         status.value = 'offline'
-      } else if (state === 'CLOSED') {
-        status.value = paused ? 'paused' : 'offline'
+        resyncOnSubscribe = true
+        detachChannel()
+        scheduleReconnect()
       }
     })
   }
 
   function unsubscribe(nextStatus: LiveStatus = 'paused'): void {
+    clearReconnect()
+
     if (refreshTimer) {
       clearTimeout(refreshTimer)
       refreshTimer = null
     }
 
-    if (channel) {
-      void supabase?.removeChannel(channel)
-      channel = null
-    }
+    detachChannel()
 
     status.value = nextStatus
   }
@@ -238,6 +309,8 @@ export function useHomeLive() {
   async function resume(): Promise<void> {
     if (isPreview || !mounted || !paused) return
     paused = false
+    reconnectAttempt = 0
+    resyncOnSubscribe = false
     subscribe()
     await load(true)
   }
@@ -248,6 +321,27 @@ export function useHomeLive() {
     } else {
       void resume()
     }
+  }
+
+  /*
+   * El WebSocket se entera de una caída, pero no siempre de una recuperación
+   * limpia: al volver la red forzamos canal nuevo y un único resync.
+   */
+  function onNetworkOnline(): void {
+    if (isPreview || !mounted || paused || !supabase) return
+
+    reconnectAttempt = 0
+    resyncOnSubscribe = false
+    unsubscribe('connecting')
+    subscribe()
+    void load(true)
+  }
+
+  function onNetworkOffline(): void {
+    if (isPreview || !mounted || paused) return
+
+    clearReconnect()
+    unsubscribe('offline')
   }
 
   async function refresh(event?: CustomEvent): Promise<void> {
@@ -289,6 +383,8 @@ export function useHomeLive() {
     }
 
     document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('online', onNetworkOnline)
+    window.addEventListener('offline', onNetworkOffline)
 
     if (Capacitor.isNativePlatform()) {
       appListener = await App.addListener('appStateChange', ({ isActive }) => {
@@ -309,6 +405,8 @@ export function useHomeLive() {
       dayTimer = null
     }
     document.removeEventListener('visibilitychange', onVisibilityChange)
+    window.removeEventListener('online', onNetworkOnline)
+    window.removeEventListener('offline', onNetworkOffline)
     void appListener?.remove()
     appListener = null
     unsubscribe('offline')
@@ -327,6 +425,8 @@ export function useHomeLive() {
 
     if (isPreview || !mounted || paused) return
 
+    reconnectAttempt = 0
+    resyncOnSubscribe = false
     unsubscribe('connecting')
     await load()
     subscribe()

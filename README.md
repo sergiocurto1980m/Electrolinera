@@ -397,6 +397,13 @@ tipo_toma ─────┘                          (histórico)
 - Al ocultar la pestaña (`visibilitychange`) o pasar la app a segundo plano
   (`@capacitor/app`), el canal se cierra.
 - Al volver, se resuscribe y se hace **un único resync**.
+- Si el canal se cae (`CHANNEL_ERROR`, `TIMED_OUT` o `CLOSED`), se reintenta con
+  esperas de 2 s, 5 s, 15 s, 30 s y 60 s; al recuperarlo se relee el snapshot,
+  porque Realtime no reenvía los eventos perdidos.
+- Al recuperar o perder la red (`online`/`offline`) se reconstruye el canal y se
+  hace un resync.
+- El botón **Actualizar** solo aparece en la web; en la app nativa se refresca
+  con el gesto de pull-to-refresh.
 - Si la sesión cambia, la Home recarga la vista correspondiente y reconstruye el
   canal, de modo que el estado aparece o desaparece sin recargar la página.
 - Si cambia el día mientras la app está abierta, la Home se recarga
