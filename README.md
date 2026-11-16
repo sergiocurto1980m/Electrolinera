@@ -12,7 +12,8 @@ Esta entrega incluye:
 - Enganche y desenganche diario a un poste libre.
 - Cola por tipo cuando todos los postes del tipo están ocupados.
 - Notificaciones in-app a los tres primeros de la cola al liberarse un puesto.
-- Notificaciones push con FCM en web y Android para los avisos de cola.
+- Notificaciones push con FCM en web y Android cuando se libera una toma para
+  los tres primeros de la cola.
 - Panel de avisos dirigido a cada usuario.
 - Autenticación: login, registro, edición de perfil y baja de cuenta.
 - Configuración de administración para activar o desactivar la confirmación de
@@ -78,6 +79,7 @@ Ejecuta en **Supabase → SQL Editor**, en este orden:
 9. [`supabase/migrations/0009_tomas_sin_app.sql`](supabase/migrations/0009_tomas_sin_app.sql)
 10. [`supabase/migrations/0010_push_notificaciones.sql`](supabase/migrations/0010_push_notificaciones.sql)
 11. [`supabase/migrations/0011_cola_con_puesto_libre.sql`](supabase/migrations/0011_cola_con_puesto_libre.sql)
+12. [`supabase/migrations/0012_push_solo_puesto_libre.sql`](supabase/migrations/0012_push_solo_puesto_libre.sql)
 
 La primera prepara la Home:
 
@@ -167,7 +169,7 @@ La décima añade las notificaciones push con FCM:
 1. Crea `dispositivos_push` con un token por instalación o navegador.
 2. Añade las RPC `registrar_dispositivo_push` y `eliminar_dispositivo_push`.
 3. Crea el trigger `on_aviso_push`, que llama de forma asíncrona a la Edge
-   Function `send-push` cada vez que se inserta un aviso personal.
+   Function `send-push` cuando se inserta un aviso marcado para push.
 4. Deja Realtime intacto: el push solo cubre la app en segundo plano o cerrada.
 
 La undécima permite entrar en una cola activa aunque haya un puesto libre:
@@ -177,6 +179,14 @@ La undécima permite entrar en una cola activa aunque haya un puesto libre:
 2. Con una cola ya activa, se puede entrar aunque se haya liberado un puesto.
 3. `engancharse` no cambia: si hay cola, sigue siendo obligatorio estar
    apuntado para ocupar un puesto libre.
+
+La duodécima limita las notificaciones push a un único caso:
+
+1. Añade `avisos.enviar_push`.
+2. Solo los avisos de **puesto libre para los tres primeros de la cola** se
+   marcan con `enviar_push = true`.
+3. El trigger ignora el resto: puesto ocupado y tomas ocupadas por personas sin
+   app siguen apareciendo en la app y en Realtime, pero no generan push.
 
 > El bloqueo del estado no es solo visual: un invitado tampoco puede leerlo
 > llamando directamente a la API de Supabase.
@@ -246,10 +256,15 @@ El PAT queda solo en los secretos de la Edge Function. Nunca debe estar en
 
 ### Configurar notificaciones push (FCM)
 
-La app usa FCM para avisar de los mismos eventos que ya crea la tabla `avisos`:
-puesto ocupado, puesto libre para los tres primeros de la cola y tomas ocupadas
-por personas sin app. El WebSocket sigue actualizando la Home en vivo; el push
+La app usa FCM **solo** para un aviso: cada vez que se libera una toma y el
+usuario está entre los tres primeros de la lista de espera de ese tipo. El resto
+de avisos (puesto ocupado, toma ocupada por una persona sin app) se siguen
+viendo en el panel Avisos y en el toast de Realtime, pero no generan
+notificación push. El WebSocket sigue actualizando la Home en vivo; el push
 solo actúa en segundo plano o con la app cerrada.
+
+Si el usuario sigue esperando, recibe un push nuevo cada vez que se libera otra
+toma; no se limita a uno por día.
 
 #### 1. Crear el proyecto en Firebase
 
@@ -432,7 +447,8 @@ completo con los datos de ejemplo.
   - Con una cola activa, solo los usuarios apuntados a esa cola pueden
     engancharse a un poste libre del tipo. Marcar una toma para otra persona no
     está limitado por la cola.
-  - Al liberarse un poste se avisa a los tres primeros de la cola.
+  - Cada vez que se libera un poste se avisa a los tres primeros de la cola,
+    aunque ya hayan recibido un aviso antes ese mismo día.
 - **Logout**: vuelve a la Home pública, sin salir de la pantalla de inicio.
 - **Realtime**:
   - Invitado: solo se suscribe a cambios del catálogo de estaciones.
@@ -584,7 +600,8 @@ supabase/
    ├─ 0008_cola_multiple.sql
    ├─ 0009_tomas_sin_app.sql
    ├─ 0010_push_notificaciones.sql
-   └─ 0011_cola_con_puesto_libre.sql
+   ├─ 0011_cola_con_puesto_libre.sql
+   └─ 0012_push_solo_puesto_libre.sql
 ```
 
 ## Modelo de datos
