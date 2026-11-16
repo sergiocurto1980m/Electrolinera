@@ -47,17 +47,45 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
           VITE_APP_URL: ${{ vars.VITE_APP_URL }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_VAPID_KEY: ${{ vars.VITE_FIREBASE_VAPID_KEY }}
         run: |
           test -n "$VITE_SUPABASE_URL" || { echo "Falta la variable VITE_SUPABASE_URL"; exit 1; }
           test -n "$VITE_SUPABASE_ANON_KEY" || { echo "Falta la variable VITE_SUPABASE_ANON_KEY"; exit 1; }
           test -n "$VITE_APP_URL" || { echo "Falta la variable VITE_APP_URL"; exit 1; }
+
+          if [ -z "$VITE_FIREBASE_API_KEY" ] \
+            || [ -z "$VITE_FIREBASE_PROJECT_ID" ] \
+            || [ -z "$VITE_FIREBASE_MESSAGING_SENDER_ID" ] \
+            || [ -z "$VITE_FIREBASE_APP_ID" ] \
+            || [ -z "$VITE_FIREBASE_VAPID_KEY" ]; then
+            echo "::warning::Faltan variables VITE_FIREBASE_*; la web se compilará sin push."
+          fi
 
       - name: Build web
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
           VITE_APP_URL: ${{ vars.VITE_APP_URL }}
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_VAPID_KEY: ${{ vars.VITE_FIREBASE_VAPID_KEY }}
         run: npm run build
+
+      - name: Preparar google-services.json
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON_BASE64" ]; then
+            echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > android/app/google-services.json
+          else
+            echo "::warning::Falta el secreto GOOGLE_SERVICES_JSON_BASE64; el APK se compilará sin push FCM."
+          fi
 
       - name: Sync Capacitor
         run: npx cap sync android

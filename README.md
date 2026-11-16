@@ -2,7 +2,7 @@
 
 App de gestión de puestos de carga para coches eléctricos. Web responsive y
 Android, construida con **Ionic 9 + Vue 3 + Vite 8** y conectada a **Supabase**
-por API REST y WebSocket (Realtime).
+por API REST y WebSocket (Realtime), con notificaciones push mediante **FCM**.
 
 Esta entrega incluye:
 
@@ -12,6 +12,7 @@ Esta entrega incluye:
 - Enganche y desenganche diario a un poste libre.
 - Cola por tipo cuando todos los postes del tipo están ocupados.
 - Notificaciones in-app a los tres primeros de la cola al liberarse un puesto.
+- Notificaciones push con FCM en web y Android para los avisos de cola.
 - Panel de avisos dirigido a cada usuario.
 - Autenticación: login, registro, edición de perfil y baja de cuenta.
 - Configuración de administración para activar o desactivar la confirmación de
@@ -28,6 +29,7 @@ Esta entrega incluye:
 | Router | Vue Router 5 + `@ionic/vue-router` |
 | Datos | Supabase (PostgREST + Realtime) |
 | Cliente | `@supabase/supabase-js` |
+| Push | Firebase Cloud Messaging (web + Android) |
 | Android | Capacitor 8 |
 | Tipografía | Inter Variable (empaquetada, funciona offline) |
 
@@ -74,6 +76,7 @@ Ejecuta en **Supabase → SQL Editor**, en este orden:
 7. [`supabase/migrations/0007_aviso_enganche.sql`](supabase/migrations/0007_aviso_enganche.sql)
 8. [`supabase/migrations/0008_cola_multiple.sql`](supabase/migrations/0008_cola_multiple.sql)
 9. [`supabase/migrations/0009_tomas_sin_app.sql`](supabase/migrations/0009_tomas_sin_app.sql)
+10. [`supabase/migrations/0010_push_notificaciones.sql`](supabase/migrations/0010_push_notificaciones.sql)
 
 La primera prepara la Home:
 
@@ -156,6 +159,14 @@ La novena permite ocupar tomas para personas que no usan la app:
 4. Un usuario puede marcar varias tomas para otros, incluso mientras ocupa una
    él mismo, y esto no le saca de ninguna cola.
 
+La décima añade las notificaciones push con FCM:
+
+1. Crea `dispositivos_push` con un token por instalación o navegador.
+2. Añade las RPC `registrar_dispositivo_push` y `eliminar_dispositivo_push`.
+3. Crea el trigger `on_aviso_push`, que llama de forma asíncrona a la Edge
+   Function `send-push` cada vez que se inserta un aviso personal.
+4. Deja Realtime intacto: el push solo cubre la app en segundo plano o cerrada.
+
 > El bloqueo del estado no es solo visual: un invitado tampoco puede leerlo
 > llamando directamente a la API de Supabase.
 >
@@ -221,6 +232,109 @@ El PAT queda solo en los secretos de la Edge Function. Nunca debe estar en
 
 > Si la Edge Function no está desplegada o falta el secreto, la pantalla de
 > configuración muestra el error y no cambia nada.
+
+### Configurar notificaciones push (FCM)
+
+La app usa FCM para avisar de los mismos eventos que ya crea la tabla `avisos`:
+puesto ocupado, puesto libre para los tres primeros de la cola y tomas ocupadas
+por personas sin app. El WebSocket sigue actualizando la Home en vivo; el push
+solo actúa en segundo plano o con la app cerrada.
+
+#### 1. Crear el proyecto en Firebase
+
+1. Crea un proyecto en <https://console.firebase.google.com>.
+2. **Añadir app Android** con el package `com.electrolinera.app` y descarga
+   `google-services.json`.
+3. **Añadir app Web** y copia su configuración:
+   `apiKey`, `projectId`, `messagingSenderId` y `appId`.
+4. **Configuración del proyecto → Cloud Messaging → Certificados push web**:
+   genera un par de claves y copia la clave pública (VAPID).
+5. **Configuración del proyecto → Cuentas de servicio → Generar nueva clave
+   privada**: descarga el JSON y guárdalo en base64 para Supabase.
+6. Comprueba que la **Firebase Cloud Messaging API (V1)** está habilitada.
+
+#### 2. Variables del frontend
+
+Rellena en `.env.local` (y en las variables `vars.*` del repositorio):
+
+```dotenv
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_MESSAGING_SENDER_ID=...
+VITE_FIREBASE_APP_ID=...
+VITE_FIREBASE_VAPID_KEY=...
+```
+
+Son valores públicos: la `apiKey` de Firebase no da acceso a la base de datos.
+Si faltan, la web compila igualmente pero el panel de notificaciones indica que
+no están disponibles.
+
+#### 3. Secretos de Supabase
+
+```bash
+# Cuenta de servicio en base64 (una sola línea)
+# Linux / Git Bash: base64 -w0 service-account.json
+# macOS: base64 -i service-account.json | tr -d '\n'
+npx supabase secrets set \
+  FCM_SERVICE_ACCOUNT_B64="<base64>" \
+  PUSH_WEBHOOK_SECRET="<secreto-aleatorio-largo>" \
+  --project-ref clgtafomlilvvnjlfvab
+
+npx supabase functions deploy send-push --no-verify-jwt \
+  --project-ref clgtafomlilvvnjlfvab
+```
+
+Después de ejecutar `0010_push_notificaciones.sql`, guarda la URL de la función
+y el mismo secreto en Vault:
+
+```sql
+select vault.create_secret(
+  'https://clgtafomlilvvnjlfvab.supabase.co/functions/v1/send-push',
+  'push_function_url'
+);
+select vault.create_secret('<secreto-aleatorio-largo>', 'push_webhook_secret');
+```
+
+Si ya existen, actualízalos con `update vault.secrets set secret = ... where name = ...`.
+
+#### 4. Android
+
+Coloca `google-services.json` en `android/app/`. Para el APK de CI, guárdalo en
+base64 como secreto `GOOGLE_SERVICES_JSON_BASE64`. El workflow lo decodifica
+antes de compilar; si falta, el APK se genera sin push pero sin romper el build.
+
+El plugin crea el canal **Avisos** al arrancar. El permiso
+`POST_NOTIFICATIONS` se pide la primera vez que hay sesión en Android 13+.
+
+#### 5. Web
+
+- Requiere Chrome o Edge y HTTPS (o `localhost` en desarrollo).
+- El service worker `public/push-sw.js` recibe los push en segundo plano.
+- El permiso se pide desde **Mi cuenta → Notificaciones → Activar
+  notificaciones**, porque Chrome exige un gesto del usuario.
+- Con la pestaña abierta y enfocada no se muestra notificación: Realtime ya
+  pinta el aviso en la Home.
+
+#### 6. Comprobar que funciona
+
+1. Inicia sesión, activa las notificaciones y verifica que aparece una fila en
+   `public.dispositivos_push` con la plataforma correcta.
+2. Inserta un aviso de prueba para ese usuario:
+
+   ```sql
+   insert into public.avisos (aviso, lista_espera_estacion_id, usuario_id, fecha_hora)
+   select 'Prueba de push', le.id, le.usuario_id, now()
+   from public.lista_espera_estacion le
+   where le.usuario_id = '<uuid-del-usuario>'
+   limit 1;
+   ```
+
+3. Cierra o minimiza la app y comprueba que llega la notificación.
+4. Al pulsarla debe abrir o enfocar la Home.
+5. Al cerrar sesión debe desaparecer el token del usuario.
+
+> Si la función no está desplegada o faltan los secretos, el trigger no rompe
+> ninguna RPC: simplemente no envía push.
 
 ### Desarrollo
 
@@ -400,14 +514,17 @@ src/
 │  └─ icons/               # SVG locales de enchufe y desenchufe
 ├─ composables/
 │  ├─ useAuth.ts           # Sesión, perfil y acciones de cuenta
-│  └─ useHomeLive.ts       # Snapshot, canal único, pausa/resync
+│  ├─ useHomeLive.ts       # Snapshot, canal único, pausa/resync
+│  └─ usePushNotifications.ts # Permiso, token FCM y deep link
 ├─ data/preview.ts         # Datos de vista previa (?preview=1)
 ├─ router/index.ts         # Rutas + guard de autenticación
 ├─ services/
 │  ├─ auth.service.ts      # Supabase Auth + tabla usuarios
 │  ├─ authSettings.service.ts # Ajuste público de confirmación de email
 │  ├─ estacion.service.ts  # RPC de enganche, desenganche y cola
+│  ├─ firebase.ts          # Init web de Firebase Messaging
 │  ├─ home.service.ts      # Consultas a las vistas
+│  ├─ push.service.ts      # Token FCM, RPC de dispositivos y desregistro
 │  └─ supabase.ts          # Cliente singleton
 ├─ styles/
 │  ├─ forms.css            # Inputs, botones y mensajes de formulario
@@ -428,14 +545,18 @@ src/
    ├─ LoginPage.vue
    ├─ RegisterPage.vue
    └─ SettingsPage.vue     # Configuración (solo admin)
+public/
+└─ push-sw.js              # Service worker de web push
 scripts/
 └─ fetch-apk.mjs           # Copia el último APK a dist/downloads en Pages
 .github/workflows/
 └─ android-apk.yml         # Build del APK firmado + release
 supabase/
 ├─ functions/
-│  └─ auth-settings/
-│     └─ index.ts          # Cambia mailer_autoconfirm vía Management API
+│  ├─ auth-settings/
+│  │  └─ index.ts          # Cambia mailer_autoconfirm vía Management API
+│  └─ send-push/
+│     └─ index.ts          # Envía los avisos por FCM HTTP v1
 └─ migrations/
    ├─ 0001_home.sql
    ├─ 0002_users.sql
@@ -445,7 +566,8 @@ supabase/
    ├─ 0006_home_cola.sql
    ├─ 0007_aviso_enganche.sql
    ├─ 0008_cola_multiple.sql
-   └─ 0009_tomas_sin_app.sql
+   ├─ 0009_tomas_sin_app.sql
+   └─ 0010_push_notificaciones.sql
 ```
 
 ## Modelo de datos
@@ -507,6 +629,10 @@ tipo_toma ─────┘                          (histórico)
 - Si cambia el día mientras la app está abierta, la Home se recarga
   automáticamente.
 - `eventsPerSecond: 10` limita la presión de eventos.
+- **Push**: el trigger de `avisos` llama a `send-push` mediante `pg_net` de
+  forma asíncrona. Cada token recibe un único mensaje FCM. Si el token ya no es
+  válido, la función lo desactiva; un fallo de FCM nunca revierte la RPC que
+  creó el aviso.
 
 ## Android
 
@@ -558,6 +684,12 @@ El APK queda en `android/app/build/outputs/apk/debug/app-debug.apk`.
   `usuario_ocupante_id = NULL`. Cualquier usuario autenticado puede marcarlas
   libres; las de usuarios registrados solo las libera su ocupante.
 - Los avisos tienen RLS por usuario: cada persona solo ve y recibe los suyos.
+- Los tokens de push viven en `dispositivos_push`; cada usuario solo puede leer
+  los suyos y las escrituras pasan por RPC.
+- La cuenta de servicio de Firebase solo existe como secreto de la Edge
+  Function (`FCM_SERVICE_ACCOUNT_B64`). El frontend nunca la recibe.
+- El secreto compartido entre `pg_net` y `send-push` está en Vault y en los
+  secretos de la función; no se guarda en el repositorio.
 - Nunca incluyas `sb_secret_...` en `.env.local` ni en el repositorio.
 - Si una secret key se ha compartido, revócala en **Project Settings → API Keys**.
 
@@ -570,6 +702,6 @@ Los iconos de enchufe y desenchufe son SVG locales basados en
 
 - Secciones de Estaciones, Lista de espera, Usuarios y Avisos.
 - Histórico de días anteriores en una pantalla específica.
-- Notificaciones push para los avisos de cola.
+- Push en iOS mediante APNs (requiere app nativa y PWA instalada en Safari).
 - Filtros por tipo de estación y búsqueda.
 - Recuperación de contraseña y verificación adicional.

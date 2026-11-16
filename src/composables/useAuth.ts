@@ -10,6 +10,7 @@ import {
   updateNombre,
 } from '@/services/auth.service'
 import { supabase } from '@/services/supabase'
+import { deactivatePushNotifications } from '@/services/push.service'
 import type { ResultadoCambioEmail, UsuarioPerfil } from '@/types/auth'
 
 const session = ref<Session | null>(null)
@@ -167,6 +168,12 @@ export function useAuth() {
   }
 
   async function signOut(): Promise<void> {
+    /*
+     * Se borra el token de push antes de cerrar la sesión: la RPC necesita el
+     * JWT para identificar al usuario.
+     */
+    await deactivatePushNotifications()
+
     try {
       await logout()
     } finally {
@@ -216,6 +223,9 @@ export function useAuth() {
     }
 
     await darDeBaja(userId)
+
+    // El token se elimina mientras la sesión aún es válida.
+    await deactivatePushNotifications()
 
     notice.value = 'Tu cuenta se ha dado de baja correctamente.'
     perfil.value = null

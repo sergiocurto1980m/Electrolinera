@@ -1,3 +1,7 @@
 /downloads/*
   Cache-Control: public, max-age=0, must-revalidate
   Content-Type: application/vnd.android.package-archive
+
+# El navegador debe poder detectar actualizaciones del service worker de push.
+/push-sw.js
+  Cache-Control: no-cache

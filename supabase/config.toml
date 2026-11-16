@@ -1,0 +1,6 @@
+# Configuración de las Edge Functions.
+#
+# send-push la invoca pg_net desde un trigger de base de datos, no un usuario
+# con JWT. La autenticación real es la cabecera x-push-secret.
+[functions.send-push]
+verify_jwt = false

@@ -86,6 +86,72 @@
           </form>
         </section>
 
+        <section class="account-panel">
+          <header class="account-panel__head">
+            <h2>Notificaciones</h2>
+            <p>
+              Recibe avisos de cola y puestos libres aunque la app esté en
+              segundo plano o cerrada.
+            </p>
+          </header>
+
+          <div class="push-state">
+            <span
+              class="push-state__dot"
+              :class="{
+                'push-state__dot--on': pushEnabled,
+                'push-state__dot--off':
+                  pushPermission === 'denied' || pushPermission === 'unsupported',
+              }"
+              aria-hidden="true"
+            />
+            <div class="push-state__body">
+              <p class="push-state__title">{{ pushTitle }}</p>
+              <p class="push-state__text">{{ pushText }}</p>
+            </div>
+          </div>
+
+          <p v-if="pushError" class="form-error" role="alert">
+            {{ pushError }}
+          </p>
+
+          <div class="push-actions">
+            <button
+              v-if="pushEnabled"
+              class="app-submit app-submit--ghost"
+              type="button"
+              :disabled="pushBusy"
+              @click="onDeactivatePush"
+            >
+              <ion-spinner
+                v-if="pushBusy"
+                name="crescent"
+                aria-hidden="true"
+              />
+              <span>
+                {{ pushBusy ? 'Desactivando…' : 'Desactivar notificaciones' }}
+              </span>
+            </button>
+
+            <button
+              v-else-if="pushSupported && pushPermission !== 'denied'"
+              class="app-submit"
+              type="button"
+              :disabled="pushBusy"
+              @click="onActivatePush"
+            >
+              <ion-spinner
+                v-if="pushBusy"
+                name="crescent"
+                aria-hidden="true"
+              />
+              <span>
+                {{ pushBusy ? 'Activando…' : 'Activar notificaciones' }}
+              </span>
+            </button>
+          </div>
+        </section>
+
         <section class="account-panel account-panel--danger">
           <header class="account-panel__head">
             <h2>Dar de baja la cuenta</h2>
@@ -139,7 +205,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   IonAlert,
@@ -156,6 +222,7 @@ import {
 } from '@ionic/vue'
 import type { AlertButton } from '@ionic/vue'
 import { useAuth } from '@/composables/useAuth'
+import { usePushNotifications } from '@/composables/usePushNotifications'
 import { mapAuthError } from '@/utils/authErrors'
 import { formatFecha } from '@/utils/format'
 
@@ -169,6 +236,17 @@ const {
   darDeBajaCuenta,
   refreshPerfil,
 } = useAuth()
+
+const {
+  permission: pushPermission,
+  error: pushError,
+  busy: pushBusy,
+  supported: pushSupported,
+  enabled: pushEnabled,
+  refresh: refreshPush,
+  activate: activatePush,
+  deactivate: deactivatePush,
+} = usePushNotifications()
 
 const nombre = ref('')
 const email = ref('')
@@ -211,6 +289,56 @@ function showToast(
   toastColor.value = color
   toastOpen.value = true
 }
+
+const pushTitle = computed(() => {
+  if (pushPermission.value === 'unsupported') return 'No disponibles'
+  if (pushPermission.value === 'denied') return 'Bloqueadas por el sistema'
+  if (pushEnabled.value) return 'Activadas en este dispositivo'
+
+  return 'Sin activar'
+})
+
+const pushText = computed(() => {
+  if (pushPermission.value === 'unsupported') {
+    return 'Este navegador o dispositivo no admite notificaciones push. En la web necesitas Chrome o Edge y que Firebase esté configurado.'
+  }
+
+  if (pushPermission.value === 'denied') {
+    return 'Has bloqueado las notificaciones. Actívalas de nuevo desde los ajustes del navegador o de la app Android.'
+  }
+
+  if (pushEnabled.value) {
+    return 'Recibirás un aviso cuando se ocupe un puesto de tu cola o se libere uno para ti. Con la app abierta, los cambios se siguen viendo en directo.'
+  }
+
+  if (pushPermission.value === 'granted') {
+    return 'El permiso está concedido, pero este dispositivo aún no está registrado. Pulsa el botón para completar el registro.'
+  }
+
+  return 'Activa las notificaciones para enterarte de los avisos aunque no tengas la app abierta.'
+})
+
+async function onActivatePush(): Promise<void> {
+  await activatePush()
+
+  if (pushError.value) {
+    showToast(pushError.value, 'danger')
+    return
+  }
+
+  if (pushEnabled.value) {
+    showToast('Notificaciones activadas.')
+  }
+}
+
+async function onDeactivatePush(): Promise<void> {
+  await deactivatePush()
+  showToast('Notificaciones desactivadas en este dispositivo.')
+}
+
+onMounted(() => {
+  void refreshPush()
+})
 
 async function onSave(): Promise<void> {
   error.value = null
@@ -448,6 +576,70 @@ async function confirmarBaja(): Promise<void> {
   font-size: 0.78rem;
   line-height: 1.5;
   color: var(--app-muted);
+}
+
+.push-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  background: rgba(7, 12, 11, 0.45);
+}
+
+.push-state__dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: var(--app-dim);
+  box-shadow: 0 0 0 3px rgba(138, 163, 155, 0.12);
+}
+
+.push-state__dot--on {
+  background: var(--app-green);
+  box-shadow: 0 0 10px rgba(43, 229, 156, 0.7);
+}
+
+.push-state__dot--off {
+  background: var(--app-red);
+  box-shadow: 0 0 0 3px rgba(255, 82, 82, 0.16);
+}
+
+.push-state__body {
+  min-width: 0;
+}
+
+.push-state__title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--app-text);
+}
+
+.push-state__text {
+  margin: 3px 0 0;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--app-muted);
+}
+
+.push-actions {
+  margin-top: 14px;
+}
+
+.app-submit--ghost {
+  background: transparent;
+  border: 1px solid var(--app-border);
+  color: var(--app-text);
+  box-shadow: none;
+}
+
+.app-submit--ghost:hover:not(:disabled) {
+  border-color: rgba(43, 229, 156, 0.45);
+  color: var(--app-green);
 }
 
 .account-panel--danger {
