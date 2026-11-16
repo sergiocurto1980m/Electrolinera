@@ -107,14 +107,14 @@ const emit = defineEmits<{
 }>()
 
 /*
- * Se puede entrar en la cola cuando el tipo está completo y no se ocupa uno
- * de sus puestos. Si ya se está apuntado, el mismo botón permite salir y
- * volver a entrar más tarde el mismo día.
+ * Se puede entrar en la cola cuando el tipo está completo o cuando ya hay una
+ * cola activa, aunque se haya liberado algún puesto. Si ya se está apuntado,
+ * el mismo botón permite salir y volver a entrar más tarde el mismo día.
  */
 const puedeEntrarEnCola = computed(
   () =>
     props.showStatus &&
-    props.grupo.completo &&
+    (props.grupo.completo || props.grupo.enCola > 0) &&
     !props.grupo.miEnCola &&
     !props.grupo.ocupadas.some((estacion) => estacion.es_mio),
 )

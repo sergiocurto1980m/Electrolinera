@@ -77,6 +77,7 @@ Ejecuta en **Supabase → SQL Editor**, en este orden:
 8. [`supabase/migrations/0008_cola_multiple.sql`](supabase/migrations/0008_cola_multiple.sql)
 9. [`supabase/migrations/0009_tomas_sin_app.sql`](supabase/migrations/0009_tomas_sin_app.sql)
 10. [`supabase/migrations/0010_push_notificaciones.sql`](supabase/migrations/0010_push_notificaciones.sql)
+11. [`supabase/migrations/0011_cola_con_puesto_libre.sql`](supabase/migrations/0011_cola_con_puesto_libre.sql)
 
 La primera prepara la Home:
 
@@ -145,7 +146,9 @@ La octava permite combinar carga y colas:
 2. Al engancharse a un puesto solo se cierra la cola de ese tipo; las demás
    siguen activas.
 3. No se permite apuntarse a la cola del tipo en el que ya se está cargando.
-4. La cola sigue exigiendo que todos los postes del tipo estén ocupados.
+4. La cola se abre cuando todos los postes del tipo están ocupados. Si ya hay
+   una cola activa, se puede seguir entrando en ella aunque se libere algún
+   puesto; sin cola previa, un puesto libre se ocupa directamente.
 
 La novena permite ocupar tomas para personas que no usan la app:
 
@@ -166,6 +169,14 @@ La décima añade las notificaciones push con FCM:
 3. Crea el trigger `on_aviso_push`, que llama de forma asíncrona a la Edge
    Function `send-push` cada vez que se inserta un aviso personal.
 4. Deja Realtime intacto: el push solo cubre la app en segundo plano o cerrada.
+
+La undécima permite entrar en una cola activa aunque haya un puesto libre:
+
+1. Sin cola previa, la cola solo se abre cuando todos los puestos están
+   ocupados.
+2. Con una cola ya activa, se puede entrar aunque se haya liberado un puesto.
+3. `engancharse` no cambia: si hay cola, sigue siendo obligatorio estar
+   apuntado para ocupar un puesto libre.
 
 > El bloqueo del estado no es solo visual: un invitado tampoco puede leerlo
 > llamando directamente a la API de Supabase.
@@ -401,12 +412,17 @@ completo con los datos de ejemplo.
     el ocupante registrado es `NULL` y cualquiera puede volver a marcarla
     libre. El usuario que la marca no queda enganchado ni sale de la cola.
 - **Cola**:
-  - Solo se permite cuando el tipo está completo.
+  - Se puede entrar cuando el tipo está completo o cuando ya hay una cola
+    activa, aunque se haya liberado algún puesto. Sin cola previa, un puesto
+    libre se ocupa directamente.
   - Un usuario puede estar en varias colas a la vez (una por tipo), incluso
     mientras está cargando en otro tipo.
   - El resumen de cada tipo muestra **Ponerse en la cola** cuando todos sus
-    puestos están ocupados y el usuario aún no está apuntado, y **Salir de la
-    cola** cuando ya está dentro.
+    puestos están ocupados o ya existe una cola activa, y el usuario aún no
+    está apuntado. Muestra **Salir de la cola** cuando ya está dentro.
+  - Si un usuario se desconecta y no hay cola, puede volver a engancharse a la
+    misma toma o a otra libre el mismo día. Si hay cola, debe apuntarse a ella
+    antes de engancharse.
   - Se puede entrar, salir y volver a entrar en la misma cola varias veces el
     mismo día: cada entrada crea una posición nueva. Solo se sale al pulsar
     **Salir de la cola** o al engancharse a un puesto; recibir un aviso no
@@ -567,7 +583,8 @@ supabase/
    ├─ 0007_aviso_enganche.sql
    ├─ 0008_cola_multiple.sql
    ├─ 0009_tomas_sin_app.sql
-   └─ 0010_push_notificaciones.sql
+   ├─ 0010_push_notificaciones.sql
+   └─ 0011_cola_con_puesto_libre.sql
 ```
 
 ## Modelo de datos

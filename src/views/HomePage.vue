@@ -607,9 +607,13 @@ function onDesengancharse(estacion: HomeEstacion): void {
 }
 
 function onEntrarEnCola(grupo: HomeGrupoEstacion): void {
+  const message = grupo.completo
+    ? `Estación ${grupo.tipo}: no quedan puestos libres. Entrarás en la cola de espera para el próximo puesto que se libere. ¿Quieres continuar?`
+    : `Estación ${grupo.tipo}: hay una cola activa. Debes apuntarte a ella para poder engancharte a un puesto libre. ¿Quieres continuar?`
+
   pendingConfirm.value = {
     header: 'Ponerse en la cola',
-    message: `Estación ${grupo.tipo}: no quedan puestos libres. Entrarás en la cola de espera para el próximo puesto que se libere. ¿Quieres continuar?`,
+    message,
     confirmText: 'Ponerme en cola',
     run: () => {
       void runAction(

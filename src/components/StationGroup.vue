@@ -85,7 +85,7 @@
         <p v-else class="queue-empty">No hay nadie en la cola.</p>
 
         <div
-          v-if="grupo.miEnCola || puedeEntrarEnCola || reservadoPorCola"
+          v-if="grupo.miEnCola || puedeEntrarEnCola"
           class="queue-actions"
         >
           <template v-if="grupo.miEnCola">
@@ -102,7 +102,11 @@
 
           <template v-else-if="puedeEntrarEnCola">
             <span class="queue-actions__note">
-              Todos los puestos están ocupados.
+              {{
+                grupo.completo
+                  ? 'Todos los puestos están ocupados.'
+                  : 'Hay una cola activa. Ponte en la cola para engancharte.'
+              }}
             </span>
             <button
               class="group__queue-btn"
@@ -113,10 +117,6 @@
               Ponerse en la cola
             </button>
           </template>
-
-          <span v-else-if="reservadoPorCola" class="queue-actions__note">
-            Puesto reservado a la cola
-          </span>
         </div>
       </section>
     </div>
@@ -169,22 +169,17 @@ const puestos = computed<HomeEstacion[]>(() =>
 /*
  * Estar cargando en otro tipo no impide apuntarse a esta cola. Solo se oculta
  * en el tipo en el que el usuario ya ocupa un puesto.
+ *
+ * Se puede entrar en la cola cuando el tipo está completo o cuando ya hay una
+ * cola activa, aunque se haya liberado algún puesto. Así un usuario que se
+ * desconecta puede volver a apuntarse y después engancharse.
  */
 const puedeEntrarEnCola = computed(
   () =>
     props.showStatus &&
     !props.grupo.miEnCola &&
-    props.grupo.completo &&
+    (props.grupo.completo || props.grupo.enCola > 0) &&
     !props.grupo.ocupadas.some((estacion) => estacion.es_mio),
-)
-
-const reservadoPorCola = computed(
-  () =>
-    props.showStatus &&
-    props.miEstacionId === null &&
-    !props.grupo.miEnCola &&
-    !props.grupo.completo &&
-    props.grupo.enCola > 0,
 )
 
 function puedeEnganchar(estacion: HomeEstacion): boolean {
